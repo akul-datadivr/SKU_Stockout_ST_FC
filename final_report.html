@@ -6724,6 +6724,24 @@
       return combined;
     }
 
+    function prefilterShelfTalkers(list) {
+      const priceKeywords = ["MRP", "₹", "BP", "ORP", "PRICE", "NOW", "@", "/-"];
+
+      // Identify pure promo talkers
+      const purePromos = list.filter(talker => {
+        const upper = talker.toUpperCase();
+        return !priceKeywords.some(keyword => upper.includes(keyword));
+      });
+
+      // If pure promos exist, return only them
+      if (purePromos.length > 0) {
+        return purePromos;
+      }
+
+      // Else return original list
+      return list;
+    }
+
     function parseShelfTalkers(list) {
       return list.map(talker => {
         const priceKeywords = ["MRP", "₹", "BP", "ORP", "Price", "NOW"];
@@ -6760,7 +6778,7 @@
         return { product: trimmed, price: "" };
       });
     }
-    
+
     function updateShelfInsights(outletId) {
       const outletRows = window.shelfInsightsData.filter(d => d["Outlet_ERP_ID"] === outletId);
 
@@ -6770,7 +6788,8 @@
       talkerTable.innerHTML = "";
 
       const allTalkers = outletRows.flatMap(r => r.Shelf_Talkers || []);
-      const parsed = parseShelfTalkers(allTalkers);
+      const filteredList = prefilterShelfTalkers(allTalkers);
+      const parsed = parseShelfTalkers(filteredList);
 
       if (allTalkers.length > 0) {
         talkerSection.style.display = "block";
