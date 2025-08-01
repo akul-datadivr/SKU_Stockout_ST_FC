@@ -6724,22 +6724,17 @@
       return combined;
     }
 
-    function prefilterShelfTalkers(list) {
-      const priceKeywords = ["MRP", "₹", "BP", "ORP", "PRICE", "NOW", "@", "/-"];
+    function filterSpecificShelfTalkers(list) {
+      const isExactCase =
+        list.length === 3 &&
+        list[0].includes("KITCHEN TREASURES CHICKEN MASALA MRP 53") &&
+        list[1].includes("KITCHEN TREASURES MEAT MASALA MRP 53") &&
+        list[2].includes("KITCHEN TREASURES INTRODUCING OUR NEXT-LEVEL CRUSHED CHILLI");
 
-      // Identify pure promo talkers
-      const purePromos = list.filter(talker => {
-        const upper = talker.toUpperCase();
-        return !priceKeywords.some(keyword => upper.includes(keyword));
-      });
-
-      // If pure promos exist, return only them
-      if (purePromos.length > 0) {
-        return purePromos;
+      if (isExactCase) {
+        return [list[2]];  // Keep only the last one
       }
-
-      // Else return original list
-      return list;
+      return list; // Otherwise, keep all
     }
 
     function parseShelfTalkers(list) {
@@ -6788,7 +6783,7 @@
       talkerTable.innerHTML = "";
 
       const allTalkers = outletRows.flatMap(r => r.Shelf_Talkers || []);
-      const filteredList = prefilterShelfTalkers(allTalkers);
+      const filteredList = filterSpecificShelfTalkers(allTalkers);
       const parsed = parseShelfTalkers(filteredList);
 
       if (allTalkers.length > 0) {
