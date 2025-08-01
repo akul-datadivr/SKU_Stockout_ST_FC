@@ -1,0 +1,3471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SKU Stockout Report</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; background: #fff; }
+    header { text-align: center; padding: 30px 15px 15px; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); position: fixed; top: 0; width: 100%; z-index: 10; }
+    header img { height: 50px; }
+    h2 { margin-top: 8px; font-size: 18px; }
+    .container { padding: 160px 15px 20px; }
+    .filters { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+    .filters label { display: flex; flex-direction: column; font-size: 14px; }
+    .filters select { padding: 6px; font-size: 14px; }
+    .report-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 600px; }
+    .report-table th { background: #2c3e50; color: white; padding: 10px; }
+    .report-table td { padding: 10px; border: 1px solid #ccc; }
+    .hidden { display: none; }
+    .card { background: white; margin-bottom: 15px; padding: 15px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+    .card div { margin-bottom: 6px; font-size: 14px; }
+    @media (min-width: 768px) {
+      .filters { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 20px; }
+      .container { padding: 180px 30px 20px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="KT-Logo.png" alt="Kitchen Treasures Logo" />
+    <h2 id="report-title">SKU Stockout Report</h2>
+  </header>
+
+  <div class="container" id="main-view">
+    <div class="filters" id="filter-section">
+      <label>Territory:
+        <select id="territory"><option value="">All Territories</option></select>
+      </label>
+      <label>Beats:
+        <select id="beats"><option value="">All Beats</option></select>
+      </label>
+      <label>Outlet ERP ID:
+        <select id="outlet"><option value="">All Outlets</option></select>
+      </label>
+      <label>Hierarchy:
+        <select id="hierarchy">
+          <option value="">Select Level</option>
+          <option value="TSM">TSM</option>
+          <option value="SO">SO</option>
+        </select>
+      </label>
+      <label id="so-label">SO/TSM:
+        <select id="so"><option value="">All SO/TSM</option></select>
+      </label>
+      <label>Entity Name:
+        <select id="entity"><option value="">All Entities</option></select>
+      </label>
+    </div>
+
+    <div id="card-view" class="hidden"></div>
+
+    <div class="table-wrapper">
+      <table class="report-table hidden" id="data-table">
+        <thead>
+          <tr>
+            <th class="col-tsm">TSM</th>
+            <th class="col-so">SO</th>
+            <th>Territory</th>
+            <th>Beat</th>
+            <th>Outlet ERP ID</th>
+            <th>Outlet Name</th>
+            <th>Entity Name</th>
+            <th>Out of Stock</th>
+            <th class="col-available_only_in_images">Available only in Images</th>
+          </tr>
+        </thead>
+        <tbody id="report-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="stock-info-view" style="display: none;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="text-align: center;">
+        <img src="KT-Logo.png" alt="Kitchen Treasures Logo" style="height: 60px;" />
+        <h2 id="stock-title">SKU Stock Info</h2>
+      </div>
+
+      <button onclick="goBack()" style="
+        margin: 20px 0;
+        padding: 10px 20px;
+        background-color: #2c3e50;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        font-size: 14px;
+      ">← Back</button>
+
+      <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+        <thead>
+          <tr style="background: #2c3e50; color: white;">
+            <th style="padding: 10px; border: 1px solid #ccc;">Entity Name</th>
+            <th style="padding: 10px; border: 1px solid #ccc;">Out of Stock</th>
+          </tr>
+        </thead>
+        <tbody id="stock-details"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    window.stockoutData = [
+  {
+    "Outlet_ERP_ID": "MPM792",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Rajani V",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE MAL -MANJERI",
+    "Outlets_Name": "HYPER BUDGET SUPERMARKET MANJERI",
+    "Entity_Name": "MASALA",
+    "Out_of_Stock": "Chicken Kebab, Chutney Powder, Fish Fry Masala, Kadala Curry Masala, Meat Ularthu, Spicy Chicken Masala",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "Biryani Masala, Chicken Fry Masala, Chicken Masala, Chilli Chicken Masala, Egg Masala, Fish Masala, Garam Masala, Meat Masala, Mutton Masala, Pickle Powder, Rasam Powder, Sambar Powder, Vegetable Masala",
+    "Not_in_both": "None"
+  },
+  {
+    "Outlet_ERP_ID": "MPM792",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Rajani V",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE MAL -MANJERI",
+    "Outlets_Name": "HYPER BUDGET SUPERMARKET MANJERI",
+    "Entity_Name": "SPICE POWDERS",
+    "Out_of_Stock": "Chilli Powder 500 g, Coriander Powder 500 g, Kashmiri Chilli Powder 500 g, Turmeric Powder 500 g",
+    "Available_only_in_images": "Chilli Powder 1 kg, Coriander Powder 1 kg",
+    "Available_in_both_images_and_stock": "Black Pepper Powder, Chilli Powder 100 g, Chilli Powder 250 g, Coriander Powder 100 g, Coriander Powder 250 g, Cumin Powder, Kashmiri Chilli Powder 100 g, Kashmiri Chilli Powder 250 g, Turmeric Powder 100 g, Turmeric Powder 250 g",
+    "Not_in_both": "Crushed Chilli 100 g, Crushed Chilli 50 g, Dry Ginger Powder, Fennel Powder, Fenugreek Powder, Kashmiri Chilli Powder 1 kg, Turmeric Powder 1 kg"
+  },
+  {
+    "Outlet_ERP_ID": "MPM792",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Rajani V",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE MAL -MANJERI",
+    "Outlets_Name": "HYPER BUDGET SUPERMARKET MANJERI",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Out_of_Stock": "Chemba puttu podi 500 g, Corn Puttu podi 500 g, Malabar Pathiri Podi 1 kg, Malabar pathiri podi 500 g, Puttu podi 500 g, Ragi Puttu podi 500 g, Roasted rice powder 500 g, Wheat Puttu podi 500 g",
+    "Available_only_in_images": "Appam/Idiyappam 1 kg, Easy Paalappam Mix 1 kg, Puttupodi 1 kg",
+    "Available_in_both_images_and_stock": "Roasted Rice Powder 1 kg",
+    "Not_in_both": "Appam/Idiyappam 500 g, Corn Puttupodi 1 kg, Double Roasted Rava 1 kg, Double roasted rava 500 g, Easy paalappam mix 500 g, Ragi Puttupodi 1 kg, Single Roasted Rava 1 kg, Single roasted rava 500 g, Wheat Puttupodi 1 kg"
+  },
+  {
+    "Outlet_ERP_ID": "CLT792",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Jisha M",
+    "Territory": "CALICUT",
+    "Beats": "KAE CLT 6 NAS",
+    "Outlets_Name": "Day Mart Naduvannure",
+    "Entity_Name": "MASALA",
+    "Out_of_Stock": "Biryani Masala, Chicken Fry Masala, Chicken Kebab, Chilli Chicken Masala, Chutney Powder, Egg Masala, Fish Fry Masala, Garam Masala, Kadala Curry Masala, Meat Ularthu, Mutton Masala, Pickle Powder, Rasam Powder, Sambar Powder, Spicy Chicken Masala, Vegetable Masala",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "Chicken Masala, Fish Masala, Meat Masala",
+    "Not_in_both": "None"
+  },
+  {
+    "Outlet_ERP_ID": "CLT792",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Jisha M",
+    "Territory": "CALICUT",
+    "Beats": "KAE CLT 6 NAS",
+    "Outlets_Name": "Day Mart Naduvannure",
+    "Entity_Name": "SPICE POWDERS",
+    "Out_of_Stock": "None",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "None",
+    "Not_in_both": "None"
+  },
+  {
+    "Outlet_ERP_ID": "CLT792",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Jisha M",
+    "Territory": "CALICUT",
+    "Beats": "KAE CLT 6 NAS",
+    "Outlets_Name": "Day Mart Naduvannure",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Out_of_Stock": "None",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "None",
+    "Not_in_both": "None"
+  },
+  {
+    "Outlet_ERP_ID": "KLM537",
+    "TSM": "Renjith Kumar",
+    "SO": "Jyothi G",
+    "Territory": "KOLLAM",
+    "Beats": "KAE-SPARK",
+    "Outlets_Name": "Anugraha Home Mart",
+    "Entity_Name": "MASALA",
+    "Out_of_Stock": "Chicken Kebab, Egg Masala, Fish Fry Masala, Kadala Curry Masala, Meat Ularthu, Mutton Masala, Pickle Powder, Spicy Chicken Masala",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "Biryani Masala, Chicken Fry Masala, Chicken Masala, Chilli Chicken Masala, Fish Masala, Garam Masala, Meat Masala, Rasam Powder, Sambar Powder, Vegetable Masala",
+    "Not_in_both": "Chutney Powder"
+  },
+  {
+    "Outlet_ERP_ID": "KLM537",
+    "TSM": "Renjith Kumar",
+    "SO": "Jyothi G",
+    "Territory": "KOLLAM",
+    "Beats": "KAE-SPARK",
+    "Outlets_Name": "Anugraha Home Mart",
+    "Entity_Name": "SPICE POWDERS",
+    "Out_of_Stock": "Chilli Powder 500 g, Coriander Powder 500 g, Fennel Powder, Kashmiri Chilli Powder 500 g, Turmeric Powder 500 g",
+    "Available_only_in_images": "Chilli Powder 1 kg, Coriander Powder 1 kg",
+    "Available_in_both_images_and_stock": "Black Pepper Powder, Chilli Powder 100 g, Chilli Powder 250 g, Coriander Powder 100 g, Coriander Powder 250 g, Cumin Powder, Fenugreek Powder, Kashmiri Chilli Powder 100 g, Kashmiri Chilli Powder 250 g, Turmeric Powder 100 g, Turmeric Powder 250 g",
+    "Not_in_both": "Crushed Chilli 100 g, Crushed Chilli 50 g, Dry Ginger Powder, Kashmiri Chilli Powder 1 kg, Turmeric Powder 1 kg"
+  },
+  {
+    "Outlet_ERP_ID": "KLM537",
+    "TSM": "Renjith Kumar",
+    "SO": "Jyothi G",
+    "Territory": "KOLLAM",
+    "Beats": "KAE-SPARK",
+    "Outlets_Name": "Anugraha Home Mart",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Out_of_Stock": "None",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "None",
+    "Not_in_both": "None"
+  },
+  {
+    "Outlet_ERP_ID": "TCR639",
+    "TSM": "Harishankar TG",
+    "SO": "Sunitha",
+    "Territory": "THRISSUR",
+    "Beats": "KAE TCR-MARIYA",
+    "Outlets_Name": "Kalyan Hypermarket Thrissur",
+    "Entity_Name": "MASALA",
+    "Out_of_Stock": "Fish Fry Masala, Sambar Powder, Spicy Chicken Masala",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "Biryani Masala, Chicken Masala, Chilli Chicken Masala, Egg Masala, Fish Masala, Garam Masala, Meat Masala, Meat Ularthu, Pickle Powder, Rasam Powder",
+    "Not_in_both": "Chicken Fry Masala, Chicken Kebab, Chutney Powder, Kadala Curry Masala, Mutton Masala, Vegetable Masala"
+  },
+  {
+    "Outlet_ERP_ID": "TCR639",
+    "TSM": "Harishankar TG",
+    "SO": "Sunitha",
+    "Territory": "THRISSUR",
+    "Beats": "KAE TCR-MARIYA",
+    "Outlets_Name": "Kalyan Hypermarket Thrissur",
+    "Entity_Name": "SPICE POWDERS",
+    "Out_of_Stock": "Black Pepper Powder, Chilli Powder 500 g, Coriander Powder 500 g, Cumin Powder, Kashmiri Chilli Powder 500 g, Turmeric Powder 500 g",
+    "Available_only_in_images": "Chilli Powder 1 kg, Coriander Powder 1 kg, Crushed Chilli 100 g",
+    "Available_in_both_images_and_stock": "Chilli Powder 100 g, Chilli Powder 250 g, Coriander Powder 100 g, Coriander Powder 250 g, Kashmiri Chilli Powder 100 g, Kashmiri Chilli Powder 250 g, Turmeric Powder 100 g, Turmeric Powder 250 g",
+    "Not_in_both": "Crushed Chilli 50 g, Dry Ginger Powder, Fennel Powder, Fenugreek Powder, Kashmiri Chilli Powder 1 kg, Turmeric Powder 1 kg"
+  },
+  {
+    "Outlet_ERP_ID": "TCR639",
+    "TSM": "Harishankar TG",
+    "SO": "Sunitha",
+    "Territory": "THRISSUR",
+    "Beats": "KAE TCR-MARIYA",
+    "Outlets_Name": "Kalyan Hypermarket Thrissur",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Out_of_Stock": "Chemba puttu podi 500 g, Corn Puttu podi 500 g, Malabar Pathiri Podi 1 kg, Malabar pathiri podi 500 g, Puttu podi 500 g, Ragi Puttu podi 500 g, Wheat Puttu podi 500 g",
+    "Available_only_in_images": "Appam/Idiyappam 1 kg, Corn Puttupodi 1 kg, Easy Paalappam Mix 1 kg, Puttupodi 1 kg, Ragi Puttupodi 1 kg, Roasted Rice Powder 1 kg, Wheat Puttupodi 1 kg",
+    "Available_in_both_images_and_stock": "None",
+    "Not_in_both": "Appam/Idiyappam 500 g, Double Roasted Rava 1 kg, Double roasted rava 500 g, Easy paalappam mix 500 g, Roasted rice powder 500 g, Single Roasted Rava 1 kg, Single roasted rava 500 g"
+  },
+  {
+    "Outlet_ERP_ID": "MPMN1467",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Deepthi",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE -ABHILASH",
+    "Outlets_Name": "AAK MALL LLP",
+    "Entity_Name": "MASALA",
+    "Out_of_Stock": "Chicken Kebab, Chutney Powder, Egg Masala, Fish Fry Masala, Garam Masala, Kadala Curry Masala, Meat Ularthu, Mutton Masala, Pickle Powder, Rasam Powder, Spicy Chicken Masala, Vegetable Masala",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "Biryani Masala, Chicken Fry Masala, Chicken Masala, Chilli Chicken Masala, Fish Masala, Meat Masala, Sambar Powder",
+    "Not_in_both": "None"
+  },
+  {
+    "Outlet_ERP_ID": "MPMN1467",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Deepthi",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE -ABHILASH",
+    "Outlets_Name": "AAK MALL LLP",
+    "Entity_Name": "SPICE POWDERS",
+    "Out_of_Stock": "Chilli Powder 100 g, Chilli Powder 250 g, Chilli Powder 500 g, Coriander Powder 100 g, Coriander Powder 250 g, Coriander Powder 500 g, Cumin Powder, Kashmiri Chilli Powder 100 g, Kashmiri Chilli Powder 250 g, Kashmiri Chilli Powder 500 g, Turmeric Powder 100 g, Turmeric Powder 250 g, Turmeric Powder 500 g",
+    "Available_only_in_images": "Fennel Powder",
+    "Available_in_both_images_and_stock": "Black Pepper Powder",
+    "Not_in_both": "Chilli Powder 1 kg, Coriander Powder 1 kg, Crushed Chilli 100 g, Crushed Chilli 50 g, Dry Ginger Powder, Fenugreek Powder, Kashmiri Chilli Powder 1 kg, Turmeric Powder 1 kg"
+  },
+  {
+    "Outlet_ERP_ID": "MPMN1467",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Deepthi",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE -ABHILASH",
+    "Outlets_Name": "AAK MALL LLP",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Out_of_Stock": "Chemba puttu podi 500 g, Corn Puttu podi 500 g, Malabar pathiri podi 500 g, Ragi Puttu podi 500 g, Roasted rice powder 500 g, Wheat Puttu podi 500 g",
+    "Available_only_in_images": "Appam/Idiyappam 1 kg, Appam/Idiyappam 500 g, Corn Puttupodi 1 kg, Puttupodi 1 kg, Wheat Puttupodi 1 kg",
+    "Available_in_both_images_and_stock": "Malabar Pathiri Podi 1 kg, Puttu podi 500 g, Roasted Rice Powder 1 kg",
+    "Not_in_both": "Double Roasted Rava 1 kg, Double roasted rava 500 g, Easy Paalappam Mix 1 kg, Easy paalappam mix 500 g, Ragi Puttupodi 1 kg, Single Roasted Rava 1 kg, Single roasted rava 500 g"
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_72193908",
+    "TSM": "Ahammed Vaseem",
+    "SO": "BIJISHA OV",
+    "Territory": "KANNUR",
+    "Beats": "KAE KNR-Thaliparamba",
+    "Outlets_Name": "Shopprix Super Center",
+    "Entity_Name": "MASALA",
+    "Out_of_Stock": "Chicken Kebab, Egg Masala, Fish Fry Masala, Garam Masala, Kadala Curry Masala, Meat Ularthu, Mutton Masala, Pickle Powder, Rasam Powder, Spicy Chicken Masala, Vegetable Masala",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "Biryani Masala, Chicken Fry Masala, Chicken Masala, Chilli Chicken Masala, Fish Masala, Meat Masala, Sambar Powder",
+    "Not_in_both": "Chutney Powder"
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_72193908",
+    "TSM": "Ahammed Vaseem",
+    "SO": "BIJISHA OV",
+    "Territory": "KANNUR",
+    "Beats": "KAE KNR-Thaliparamba",
+    "Outlets_Name": "Shopprix Super Center",
+    "Entity_Name": "SPICE POWDERS",
+    "Out_of_Stock": "None",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "None",
+    "Not_in_both": "None"
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_72193908",
+    "TSM": "Ahammed Vaseem",
+    "SO": "BIJISHA OV",
+    "Territory": "KANNUR",
+    "Beats": "KAE KNR-Thaliparamba",
+    "Outlets_Name": "Shopprix Super Center",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Out_of_Stock": "Chemba puttu podi 500 g, Corn Puttu podi 500 g, Malabar Pathiri Podi 1 kg, Malabar pathiri podi 500 g, Puttu podi 500 g, Ragi Puttu podi 500 g, Roasted Rice Powder 1 kg, Wheat Puttu podi 500 g",
+    "Available_only_in_images": "Appam/Idiyappam 1 kg, Appam/Idiyappam 500 g, Puttupodi 1 kg",
+    "Available_in_both_images_and_stock": "Roasted rice powder 500 g",
+    "Not_in_both": "Corn Puttupodi 1 kg, Double Roasted Rava 1 kg, Double roasted rava 500 g, Easy Paalappam Mix 1 kg, Easy paalappam mix 500 g, Ragi Puttupodi 1 kg, Single Roasted Rava 1 kg, Single roasted rava 500 g, Wheat Puttupodi 1 kg"
+  },
+  {
+    "Outlet_ERP_ID": "PATHANAMTHITTA00062",
+    "TSM": "Renjith Kumar",
+    "SO": "Shilpa",
+    "Territory": "PATHANAMTHITTA",
+    "Beats": "NEW ALANKAR - PTA",
+    "Outlets_Name": "Alankar Super Market",
+    "Entity_Name": "MASALA",
+    "Out_of_Stock": "Chicken Fry Masala, Egg Masala, Kadala Curry Masala, Spicy Chicken Masala",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "Biryani Masala, Chicken Masala, Fish Fry Masala, Fish Masala, Garam Masala, Meat Masala, Meat Ularthu, Mutton Masala, Pickle Powder, Rasam Powder, Sambar Powder, Vegetable Masala",
+    "Not_in_both": "Chicken Kebab, Chilli Chicken Masala, Chutney Powder"
+  },
+  {
+    "Outlet_ERP_ID": "PATHANAMTHITTA00062",
+    "TSM": "Renjith Kumar",
+    "SO": "Shilpa",
+    "Territory": "PATHANAMTHITTA",
+    "Beats": "NEW ALANKAR - PTA",
+    "Outlets_Name": "Alankar Super Market",
+    "Entity_Name": "SPICE POWDERS",
+    "Out_of_Stock": "Black Pepper Powder, Chilli Powder 500 g, Coriander Powder 500 g, Cumin Powder, Kashmiri Chilli Powder 500 g",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "Chilli Powder 100 g, Chilli Powder 250 g, Coriander Powder 100 g, Coriander Powder 250 g, Kashmiri Chilli Powder 100 g, Kashmiri Chilli Powder 250 g, Turmeric Powder 100 g, Turmeric Powder 250 g",
+    "Not_in_both": "Chilli Powder 1 kg, Coriander Powder 1 kg, Crushed Chilli 100 g, Crushed Chilli 50 g, Dry Ginger Powder, Fennel Powder, Fenugreek Powder, Kashmiri Chilli Powder 1 kg, Turmeric Powder 1 kg, Turmeric Powder 500 g"
+  },
+  {
+    "Outlet_ERP_ID": "PATHANAMTHITTA00062",
+    "TSM": "Renjith Kumar",
+    "SO": "Shilpa",
+    "Territory": "PATHANAMTHITTA",
+    "Beats": "NEW ALANKAR - PTA",
+    "Outlets_Name": "Alankar Super Market",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Out_of_Stock": "Corn Puttu podi 500 g, Puttu podi 500 g, Ragi Puttu podi 500 g, Roasted rice powder 500 g, Wheat Puttu podi 500 g",
+    "Available_only_in_images": "Appam/Idiyappam 1 kg, Easy Paalappam Mix 1 kg, Malabar Pathiri Podi 1 kg, Puttupodi 1 kg, Wheat Puttupodi 1 kg",
+    "Available_in_both_images_and_stock": "Chemba puttu podi 500 g, Roasted Rice Powder 1 kg",
+    "Not_in_both": "Appam/Idiyappam 500 g, Corn Puttupodi 1 kg, Double Roasted Rava 1 kg, Double roasted rava 500 g, Easy paalappam mix 500 g, Malabar pathiri podi 500 g, Ragi Puttupodi 1 kg, Single Roasted Rava 1 kg, Single roasted rava 500 g"
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_80058288",
+    "TSM": "Renjith Kumar",
+    "SO": "Remya",
+    "Territory": "TRIVANDRUM",
+    "Beats": "OACHIRA TRADERS",
+    "Outlets_Name": "Oachira Trader",
+    "Entity_Name": "MASALA",
+    "Out_of_Stock": "Chicken Fry Masala",
+    "Available_only_in_images": "Biryani Masala, Chilli Chicken Masala, Vegetable Masala",
+    "Available_in_both_images_and_stock": "Chicken Masala, Fish Masala, Garam Masala, Meat Masala, Pickle Powder, Rasam Powder, Sambar Powder",
+    "Not_in_both": "Chicken Kebab, Chutney Powder, Egg Masala, Fish Fry Masala, Kadala Curry Masala, Meat Ularthu, Mutton Masala, Spicy Chicken Masala"
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_80058288",
+    "TSM": "Renjith Kumar",
+    "SO": "Remya",
+    "Territory": "TRIVANDRUM",
+    "Beats": "OACHIRA TRADERS",
+    "Outlets_Name": "Oachira Trader",
+    "Entity_Name": "SPICE POWDERS",
+    "Out_of_Stock": "Black Pepper Powder, Chilli Powder 500 g, Coriander Powder 500 g, Kashmiri Chilli Powder 500 g",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "Chilli Powder 100 g, Chilli Powder 250 g, Coriander Powder 100 g, Coriander Powder 250 g, Kashmiri Chilli Powder 100 g, Kashmiri Chilli Powder 250 g, Turmeric Powder 100 g, Turmeric Powder 250 g",
+    "Not_in_both": "Chilli Powder 1 kg, Coriander Powder 1 kg, Crushed Chilli 100 g, Crushed Chilli 50 g, Cumin Powder, Dry Ginger Powder, Fennel Powder, Fenugreek Powder, Kashmiri Chilli Powder 1 kg, Turmeric Powder 1 kg, Turmeric Powder 500 g"
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_80058288",
+    "TSM": "Renjith Kumar",
+    "SO": "Remya",
+    "Territory": "TRIVANDRUM",
+    "Beats": "OACHIRA TRADERS",
+    "Outlets_Name": "Oachira Trader",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Out_of_Stock": "None",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "None",
+    "Not_in_both": "None"
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_414855399",
+    "TSM": "Renjith Kumar",
+    "SO": "Praveena",
+    "Territory": "TRIVANDRUM",
+    "Beats": "KAE TVM 6",
+    "Outlets_Name": "Vismaya Hypermarket",
+    "Entity_Name": "MASALA",
+    "Out_of_Stock": "Biryani Masala, Chicken Kebab, Chilli Chicken Masala, Chutney Powder, Egg Masala, Fish Fry Masala, Fish Masala, Garam Masala, Kadala Curry Masala, Meat Masala, Meat Ularthu, Mutton Masala, Pickle Powder, Rasam Powder, Sambar Powder, Spicy Chicken Masala, Vegetable Masala",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "Chicken Fry Masala, Chicken Masala",
+    "Not_in_both": "None"
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_414855399",
+    "TSM": "Renjith Kumar",
+    "SO": "Praveena",
+    "Territory": "TRIVANDRUM",
+    "Beats": "KAE TVM 6",
+    "Outlets_Name": "Vismaya Hypermarket",
+    "Entity_Name": "SPICE POWDERS",
+    "Out_of_Stock": "Black Pepper Powder, Chilli Powder 100 g, Chilli Powder 250 g, Chilli Powder 500 g, Coriander Powder 100 g, Coriander Powder 250 g, Coriander Powder 500 g, Cumin Powder, Dry Ginger Powder, Fennel Powder, Fenugreek Powder, Kashmiri Chilli Powder 100 g, Kashmiri Chilli Powder 500 g, Turmeric Powder 100 g, Turmeric Powder 250 g, Turmeric Powder 500 g",
+    "Available_only_in_images": "Chilli Powder 1 kg",
+    "Available_in_both_images_and_stock": "Kashmiri Chilli Powder 250 g",
+    "Not_in_both": "Coriander Powder 1 kg, Crushed Chilli 100 g, Crushed Chilli 50 g, Kashmiri Chilli Powder 1 kg, Turmeric Powder 1 kg"
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_414855399",
+    "TSM": "Renjith Kumar",
+    "SO": "Praveena",
+    "Territory": "TRIVANDRUM",
+    "Beats": "KAE TVM 6",
+    "Outlets_Name": "Vismaya Hypermarket",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Out_of_Stock": "Chemba puttu podi 500 g, Corn Puttu podi 500 g, Malabar pathiri podi 500 g, Puttu podi 500 g, Ragi Puttu podi 500 g, Roasted Rice Powder 1 kg, Roasted rice powder 500 g, Wheat Puttu podi 500 g",
+    "Available_only_in_images": "Corn Puttupodi 1 kg, Wheat Puttupodi 1 kg",
+    "Available_in_both_images_and_stock": "None",
+    "Not_in_both": "Appam/Idiyappam 1 kg, Appam/Idiyappam 500 g, Double Roasted Rava 1 kg, Double roasted rava 500 g, Easy Paalappam Mix 1 kg, Easy paalappam mix 500 g, Malabar Pathiri Podi 1 kg, Puttupodi 1 kg, Ragi Puttupodi 1 kg, Single Roasted Rava 1 kg, Single roasted rava 500 g"
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_93613923",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Vineetha MD",
+    "Territory": "WAYANAD",
+    "Beats": "MANANTHAVADY",
+    "Outlets_Name": "DAY MART HYPERMARKET",
+    "Entity_Name": "MASALA",
+    "Out_of_Stock": "Chicken Kebab, Chutney Powder, Fish Fry Masala, Garam Masala, Kadala Curry Masala, Meat Ularthu, Spicy Chicken Masala",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "Biryani Masala, Chicken Fry Masala, Chicken Masala, Chilli Chicken Masala, Egg Masala, Fish Masala, Meat Masala, Mutton Masala, Pickle Powder, Rasam Powder, Sambar Powder, Vegetable Masala",
+    "Not_in_both": "None"
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_93613923",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Vineetha MD",
+    "Territory": "WAYANAD",
+    "Beats": "MANANTHAVADY",
+    "Outlets_Name": "DAY MART HYPERMARKET",
+    "Entity_Name": "SPICE POWDERS",
+    "Out_of_Stock": "Chilli Powder 500 g, Coriander Powder 500 g, Dry Ginger Powder, Fennel Powder, Kashmiri Chilli Powder 500 g, Turmeric Powder 500 g",
+    "Available_only_in_images": "Crushed Chilli 100 g, Fenugreek Powder",
+    "Available_in_both_images_and_stock": "Black Pepper Powder, Chilli Powder 100 g, Chilli Powder 250 g, Coriander Powder 100 g, Coriander Powder 250 g, Cumin Powder, Kashmiri Chilli Powder 100 g, Kashmiri Chilli Powder 250 g, Turmeric Powder 100 g, Turmeric Powder 250 g",
+    "Not_in_both": "Chilli Powder 1 kg, Coriander Powder 1 kg, Crushed Chilli 50 g, Kashmiri Chilli Powder 1 kg, Turmeric Powder 1 kg"
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_93613923",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Vineetha MD",
+    "Territory": "WAYANAD",
+    "Beats": "MANANTHAVADY",
+    "Outlets_Name": "DAY MART HYPERMARKET",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Out_of_Stock": "Corn Puttu podi 500 g, Malabar Pathiri Podi 1 kg, Ragi Puttu podi 500 g, Roasted Rice Powder 1 kg, Wheat Puttu podi 500 g",
+    "Available_only_in_images": "Appam/Idiyappam 500 g, Easy paalappam mix 500 g, Puttupodi 1 kg",
+    "Available_in_both_images_and_stock": "Chemba puttu podi 500 g, Malabar pathiri podi 500 g, Puttu podi 500 g, Roasted rice powder 500 g",
+    "Not_in_both": "Appam/Idiyappam 1 kg, Corn Puttupodi 1 kg, Double Roasted Rava 1 kg, Double roasted rava 500 g, Easy Paalappam Mix 1 kg, Ragi Puttupodi 1 kg, Single Roasted Rava 1 kg, Single roasted rava 500 g, Wheat Puttupodi 1 kg"
+  },
+  {
+    "Outlet_ERP_ID": "ALP 4",
+    "TSM": "Renjith Kumar",
+    "SO": "Sajitha. D",
+    "Territory": "ALLEPPEY",
+    "Beats": "KAE-ALPY-MG AGENCIES",
+    "Outlets_Name": "Edha Hyper Market",
+    "Entity_Name": "MASALA",
+    "Out_of_Stock": "Chicken Fry Masala, Garam Masala, Kadala Curry Masala, Meat Ularthu, Pickle Powder, Rasam Powder, Sambar Powder, Spicy Chicken Masala, Vegetable Masala",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "Biryani Masala, Chicken Masala, Egg Masala, Fish Fry Masala, Fish Masala, Meat Masala, Mutton Masala",
+    "Not_in_both": "Chicken Kebab, Chilli Chicken Masala, Chutney Powder"
+  },
+  {
+    "Outlet_ERP_ID": "ALP 4",
+    "TSM": "Renjith Kumar",
+    "SO": "Sajitha. D",
+    "Territory": "ALLEPPEY",
+    "Beats": "KAE-ALPY-MG AGENCIES",
+    "Outlets_Name": "Edha Hyper Market",
+    "Entity_Name": "SPICE POWDERS",
+    "Out_of_Stock": "Black Pepper Powder, Chilli Powder 500 g, Coriander Powder 100 g, Coriander Powder 250 g, Coriander Powder 500 g, Dry Ginger Powder, Fennel Powder, Kashmiri Chilli Powder 100 g, Kashmiri Chilli Powder 500 g, Turmeric Powder 100 g",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "Chilli Powder 100 g, Chilli Powder 250 g, Cumin Powder, Fenugreek Powder, Kashmiri Chilli Powder 250 g, Turmeric Powder 250 g",
+    "Not_in_both": "Chilli Powder 1 kg, Coriander Powder 1 kg, Crushed Chilli 100 g, Crushed Chilli 50 g, Kashmiri Chilli Powder 1 kg, Turmeric Powder 1 kg, Turmeric Powder 500 g"
+  },
+  {
+    "Outlet_ERP_ID": "ALP 4",
+    "TSM": "Renjith Kumar",
+    "SO": "Sajitha. D",
+    "Territory": "ALLEPPEY",
+    "Beats": "KAE-ALPY-MG AGENCIES",
+    "Outlets_Name": "Edha Hyper Market",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Out_of_Stock": "Chemba puttu podi 500 g, Corn Puttu podi 500 g, Puttu podi 500 g, Ragi Puttu podi 500 g, Roasted rice powder 500 g, Wheat Puttu podi 500 g",
+    "Available_only_in_images": "Appam/Idiyappam 500 g, Corn Puttupodi 1 kg, Puttupodi 1 kg",
+    "Available_in_both_images_and_stock": "Roasted Rice Powder 1 kg",
+    "Not_in_both": "Appam/Idiyappam 1 kg, Double Roasted Rava 1 kg, Double roasted rava 500 g, Easy Paalappam Mix 1 kg, Easy paalappam mix 500 g, Malabar Pathiri Podi 1 kg, Malabar pathiri podi 500 g, Ragi Puttupodi 1 kg, Single Roasted Rava 1 kg, Single roasted rava 500 g, Wheat Puttupodi 1 kg"
+  },
+  {
+    "Outlet_ERP_ID": "rahim",
+    "TSM": "Harishankar TG",
+    "SO": "Renjini jude",
+    "Territory": "ALLEPPEY",
+    "Beats": "KAE-ALPY-MID LINE",
+    "Outlets_Name": "Priya Supermarket",
+    "Entity_Name": "MASALA",
+    "Out_of_Stock": "Chicken Kebab, Chutney Powder, Egg Masala, Fish Fry Masala, Garam Masala, Kadala Curry Masala, Meat Ularthu, Mutton Masala, Pickle Powder, Rasam Powder, Spicy Chicken Masala, Vegetable Masala",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "Biryani Masala, Chicken Fry Masala, Chicken Masala, Chilli Chicken Masala, Fish Masala, Meat Masala, Sambar Powder",
+    "Not_in_both": "None"
+  },
+  {
+    "Outlet_ERP_ID": "rahim",
+    "TSM": "Harishankar TG",
+    "SO": "Renjini jude",
+    "Territory": "ALLEPPEY",
+    "Beats": "KAE-ALPY-MID LINE",
+    "Outlets_Name": "Priya Supermarket",
+    "Entity_Name": "SPICE POWDERS",
+    "Out_of_Stock": "Chilli Powder 500 g, Coriander Powder 500 g, Dry Ginger Powder, Fennel Powder, Kashmiri Chilli Powder 500 g, Turmeric Powder 500 g",
+    "Available_only_in_images": "Chilli Powder 1 kg, Coriander Powder 1 kg",
+    "Available_in_both_images_and_stock": "Black Pepper Powder, Chilli Powder 100 g, Chilli Powder 250 g, Coriander Powder 100 g, Coriander Powder 250 g, Cumin Powder, Fenugreek Powder, Kashmiri Chilli Powder 100 g, Kashmiri Chilli Powder 250 g, Turmeric Powder 100 g, Turmeric Powder 250 g",
+    "Not_in_both": "Crushed Chilli 100 g, Crushed Chilli 50 g, Kashmiri Chilli Powder 1 kg, Turmeric Powder 1 kg"
+  },
+  {
+    "Outlet_ERP_ID": "rahim",
+    "TSM": "Harishankar TG",
+    "SO": "Renjini jude",
+    "Territory": "ALLEPPEY",
+    "Beats": "KAE-ALPY-MID LINE",
+    "Outlets_Name": "Priya Supermarket",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Out_of_Stock": "None",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "None",
+    "Not_in_both": "None"
+  },
+  {
+    "Outlet_ERP_ID": "MPM3063",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Suhaila MLP",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE -HR1",
+    "Outlets_Name": "Budget Hypermarket Kondotty",
+    "Entity_Name": "MASALA",
+    "Out_of_Stock": "Chicken Kebab, Chutney Powder, Kadala Curry Masala",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "Biryani Masala, Chicken Fry Masala, Chicken Masala, Chilli Chicken Masala, Egg Masala, Fish Fry Masala, Fish Masala, Garam Masala, Meat Masala, Meat Ularthu, Mutton Masala, Pickle Powder, Rasam Powder, Sambar Powder, Spicy Chicken Masala, Vegetable Masala",
+    "Not_in_both": "None"
+  },
+  {
+    "Outlet_ERP_ID": "MPM3063",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Suhaila MLP",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE -HR1",
+    "Outlets_Name": "Budget Hypermarket Kondotty",
+    "Entity_Name": "SPICE POWDERS",
+    "Out_of_Stock": "Chilli Powder 500 g, Coriander Powder 500 g, Kashmiri Chilli Powder 500 g, Turmeric Powder 500 g",
+    "Available_only_in_images": "Chilli Powder 1 kg, Coriander Powder 1 kg, Fenugreek Powder",
+    "Available_in_both_images_and_stock": "Black Pepper Powder, Chilli Powder 100 g, Chilli Powder 250 g, Coriander Powder 100 g, Coriander Powder 250 g, Cumin Powder, Kashmiri Chilli Powder 100 g, Kashmiri Chilli Powder 250 g, Turmeric Powder 100 g, Turmeric Powder 250 g",
+    "Not_in_both": "Crushed Chilli 100 g, Crushed Chilli 50 g, Dry Ginger Powder, Fennel Powder, Kashmiri Chilli Powder 1 kg, Turmeric Powder 1 kg"
+  },
+  {
+    "Outlet_ERP_ID": "MPM3063",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Suhaila MLP",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE -HR1",
+    "Outlets_Name": "Budget Hypermarket Kondotty",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Out_of_Stock": "Chemba puttu podi 500 g, Corn Puttu podi 500 g, Malabar Pathiri Podi 1 kg, Malabar pathiri podi 500 g, Puttu podi 500 g, Ragi Puttu podi 500 g, Roasted Rice Powder 1 kg, Roasted rice powder 500 g, Wheat Puttu podi 500 g",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "None",
+    "Not_in_both": "Appam/Idiyappam 1 kg, Appam/Idiyappam 500 g, Corn Puttupodi 1 kg, Double Roasted Rava 1 kg, Double roasted rava 500 g, Easy Paalappam Mix 1 kg, Easy paalappam mix 500 g, Puttupodi 1 kg, Ragi Puttupodi 1 kg, Single Roasted Rava 1 kg, Single roasted rava 500 g, Wheat Puttupodi 1 kg"
+  },
+  {
+    "Outlet_ERP_ID": "CALICUT00525",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Shabina",
+    "Territory": "CALICUT",
+    "Beats": "MAHE",
+    "Outlets_Name": "CARREFRESH HYPER MARKET AZHIYOOR",
+    "Entity_Name": "MASALA",
+    "Out_of_Stock": "Chicken Kebab, Kadala Curry Masala, Spicy Chicken Masala",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "Biryani Masala, Chicken Fry Masala, Chicken Masala, Chilli Chicken Masala, Egg Masala, Fish Masala, Garam Masala, Meat Masala, Meat Ularthu, Mutton Masala, Pickle Powder, Rasam Powder, Sambar Powder, Vegetable Masala",
+    "Not_in_both": "Chutney Powder, Fish Fry Masala"
+  },
+  {
+    "Outlet_ERP_ID": "CALICUT00525",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Shabina",
+    "Territory": "CALICUT",
+    "Beats": "MAHE",
+    "Outlets_Name": "CARREFRESH HYPER MARKET AZHIYOOR",
+    "Entity_Name": "SPICE POWDERS",
+    "Out_of_Stock": "Black Pepper Powder, Chilli Powder 500 g, Coriander Powder 500 g, Cumin Powder, Dry Ginger Powder, Fennel Powder, Fenugreek Powder, Kashmiri Chilli Powder 500 g, Turmeric Powder 500 g",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "Chilli Powder 100 g, Chilli Powder 250 g, Coriander Powder 100 g, Coriander Powder 250 g, Kashmiri Chilli Powder 100 g, Kashmiri Chilli Powder 250 g, Turmeric Powder 100 g, Turmeric Powder 250 g",
+    "Not_in_both": "Chilli Powder 1 kg, Coriander Powder 1 kg, Crushed Chilli 100 g, Crushed Chilli 50 g, Kashmiri Chilli Powder 1 kg, Turmeric Powder 1 kg"
+  },
+  {
+    "Outlet_ERP_ID": "CALICUT00525",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Shabina",
+    "Territory": "CALICUT",
+    "Beats": "MAHE",
+    "Outlets_Name": "CARREFRESH HYPER MARKET AZHIYOOR",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Out_of_Stock": "Corn Puttu podi 500 g, Malabar pathiri podi 500 g, Puttu podi 500 g, Ragi Puttu podi 500 g, Roasted Rice Powder 1 kg, Wheat Puttu podi 500 g",
+    "Available_only_in_images": "Appam/Idiyappam 1 kg, Appam/Idiyappam 500 g, Corn Puttupodi 1 kg, Easy Paalappam Mix 1 kg, Puttupodi 1 kg, Ragi Puttupodi 1 kg, Wheat Puttupodi 1 kg",
+    "Available_in_both_images_and_stock": "Chemba puttu podi 500 g, Malabar Pathiri Podi 1 kg",
+    "Not_in_both": "Double Roasted Rava 1 kg, Double roasted rava 500 g, Easy paalappam mix 500 g, Roasted rice powder 500 g, Single Roasted Rava 1 kg, Single roasted rava 500 g"
+  },
+  {
+    "Outlet_ERP_ID": "WYD671",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Sindhu AV",
+    "Territory": "WAYANAD",
+    "Beats": "KALPATTA",
+    "Outlets_Name": "Jamjoom Plaza Pvt Ltd . Kalpetta",
+    "Entity_Name": "MASALA",
+    "Out_of_Stock": "Chicken Kebab, Chutney Powder, Fish Fry Masala, Garam Masala, Kadala Curry Masala, Meat Ularthu",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "Biryani Masala, Chicken Fry Masala, Chicken Masala, Chilli Chicken Masala, Egg Masala, Fish Masala, Meat Masala, Mutton Masala, Pickle Powder, Rasam Powder, Sambar Powder, Spicy Chicken Masala, Vegetable Masala",
+    "Not_in_both": "None"
+  },
+  {
+    "Outlet_ERP_ID": "WYD671",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Sindhu AV",
+    "Territory": "WAYANAD",
+    "Beats": "KALPATTA",
+    "Outlets_Name": "Jamjoom Plaza Pvt Ltd . Kalpetta",
+    "Entity_Name": "SPICE POWDERS",
+    "Out_of_Stock": "Chilli Powder 500 g, Coriander Powder 500 g, Dry Ginger Powder, Fennel Powder, Fenugreek Powder, Kashmiri Chilli Powder 500 g, Turmeric Powder 500 g",
+    "Available_only_in_images": "Chilli Powder 1 kg",
+    "Available_in_both_images_and_stock": "Black Pepper Powder, Chilli Powder 100 g, Chilli Powder 250 g, Coriander Powder 100 g, Coriander Powder 250 g, Cumin Powder, Kashmiri Chilli Powder 100 g, Kashmiri Chilli Powder 250 g, Turmeric Powder 100 g, Turmeric Powder 250 g",
+    "Not_in_both": "Coriander Powder 1 kg, Crushed Chilli 100 g, Crushed Chilli 50 g, Kashmiri Chilli Powder 1 kg, Turmeric Powder 1 kg"
+  },
+  {
+    "Outlet_ERP_ID": "WYD671",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Sindhu AV",
+    "Territory": "WAYANAD",
+    "Beats": "KALPATTA",
+    "Outlets_Name": "Jamjoom Plaza Pvt Ltd . Kalpetta",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Out_of_Stock": "Chemba puttu podi 500 g, Corn Puttu podi 500 g, Malabar Pathiri Podi 1 kg, Malabar pathiri podi 500 g, Puttu podi 500 g, Ragi Puttu podi 500 g, Roasted Rice Powder 1 kg, Wheat Puttu podi 500 g",
+    "Available_only_in_images": "Appam/Idiyappam 500 g, Puttupodi 1 kg",
+    "Available_in_both_images_and_stock": "Roasted rice powder 500 g",
+    "Not_in_both": "Appam/Idiyappam 1 kg, Corn Puttupodi 1 kg, Double Roasted Rava 1 kg, Double roasted rava 500 g, Easy Paalappam Mix 1 kg, Easy paalappam mix 500 g, Ragi Puttupodi 1 kg, Single Roasted Rava 1 kg, Single roasted rava 500 g, Wheat Puttupodi 1 kg"
+  },
+  {
+    "Outlet_ERP_ID": "EKM020",
+    "TSM": "Harishankar TG",
+    "SO": "Renjini jude",
+    "Territory": "ERNAKULAM",
+    "Beats": "WH-MANNA",
+    "Outlets_Name": "Anupam Traders",
+    "Entity_Name": "MASALA",
+    "Out_of_Stock": "None",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "None",
+    "Not_in_both": "None"
+  },
+  {
+    "Outlet_ERP_ID": "EKM020",
+    "TSM": "Harishankar TG",
+    "SO": "Renjini jude",
+    "Territory": "ERNAKULAM",
+    "Beats": "WH-MANNA",
+    "Outlets_Name": "Anupam Traders",
+    "Entity_Name": "SPICE POWDERS",
+    "Out_of_Stock": "None",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "None",
+    "Not_in_both": "None"
+  },
+  {
+    "Outlet_ERP_ID": "EKM020",
+    "TSM": "Harishankar TG",
+    "SO": "Renjini jude",
+    "Territory": "ERNAKULAM",
+    "Beats": "WH-MANNA",
+    "Outlets_Name": "Anupam Traders",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Out_of_Stock": "Chemba puttu podi 500 g, Corn Puttu podi 500 g, Puttu podi 500 g, Ragi Puttu podi 500 g, Wheat Puttu podi 500 g",
+    "Available_only_in_images": "Appam/Idiyappam 1 kg, Puttupodi 1 kg",
+    "Available_in_both_images_and_stock": "None",
+    "Not_in_both": "Appam/Idiyappam 500 g, Corn Puttupodi 1 kg, Double Roasted Rava 1 kg, Double roasted rava 500 g, Easy Paalappam Mix 1 kg, Easy paalappam mix 500 g, Malabar Pathiri Podi 1 kg, Malabar pathiri podi 500 g, Ragi Puttupodi 1 kg, Roasted Rice Powder 1 kg, Roasted rice powder 500 g, Single Roasted Rava 1 kg, Single roasted rava 500 g, Wheat Puttupodi 1 kg"
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_199477017",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Malavika",
+    "Territory": "KASARGOD",
+    "Beats": "KANHANAGAD",
+    "Outlets_Name": "Shoprix Super Center Kanhangad",
+    "Entity_Name": "MASALA",
+    "Out_of_Stock": "None",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "None",
+    "Not_in_both": "None"
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_199477017",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Malavika",
+    "Territory": "KASARGOD",
+    "Beats": "KANHANAGAD",
+    "Outlets_Name": "Shoprix Super Center Kanhangad",
+    "Entity_Name": "SPICE POWDERS",
+    "Out_of_Stock": "Black Pepper Powder, Dry Ginger Powder",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "Chilli Powder 100 g, Chilli Powder 250 g, Coriander Powder 100 g, Coriander Powder 250 g, Kashmiri Chilli Powder 100 g, Kashmiri Chilli Powder 250 g, Turmeric Powder 100 g, Turmeric Powder 250 g",
+    "Not_in_both": "Chilli Powder 1 kg, Chilli Powder 500 g, Coriander Powder 1 kg, Coriander Powder 500 g, Crushed Chilli 100 g, Crushed Chilli 50 g, Cumin Powder, Fennel Powder, Fenugreek Powder, Kashmiri Chilli Powder 1 kg, Kashmiri Chilli Powder 500 g, Turmeric Powder 1 kg, Turmeric Powder 500 g"
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_199477017",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Malavika",
+    "Territory": "KASARGOD",
+    "Beats": "KANHANAGAD",
+    "Outlets_Name": "Shoprix Super Center Kanhangad",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Out_of_Stock": "Chemba puttu podi 500 g, Corn Puttu podi 500 g, Malabar Pathiri Podi 1 kg, Malabar pathiri podi 500 g, Puttu podi 500 g, Ragi Puttu podi 500 g, Roasted rice powder 500 g, Wheat Puttu podi 500 g",
+    "Available_only_in_images": "Appam/Idiyappam 500 g, Puttupodi 1 kg",
+    "Available_in_both_images_and_stock": "Roasted Rice Powder 1 kg",
+    "Not_in_both": "Appam/Idiyappam 1 kg, Corn Puttupodi 1 kg, Double Roasted Rava 1 kg, Double roasted rava 500 g, Easy Paalappam Mix 1 kg, Easy paalappam mix 500 g, Ragi Puttupodi 1 kg, Single Roasted Rava 1 kg, Single roasted rava 500 g, Wheat Puttupodi 1 kg"
+  },
+  {
+    "Outlet_ERP_ID": "KAZ584",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Divya KSD",
+    "Territory": "KASARGOD",
+    "Beats": "KASARAGOD",
+    "Outlets_Name": "VISWAS ASSOCIATES",
+    "Entity_Name": "MASALA",
+    "Out_of_Stock": "None",
+    "Available_only_in_images": "Biryani Masala, Chicken Masala, Fish Masala, Meat Masala, Sambar Powder",
+    "Available_in_both_images_and_stock": "None",
+    "Not_in_both": "Chicken Fry Masala, Chicken Kebab, Chilli Chicken Masala, Chutney Powder, Egg Masala, Fish Fry Masala, Garam Masala, Kadala Curry Masala, Meat Ularthu, Mutton Masala, Pickle Powder, Rasam Powder, Spicy Chicken Masala, Vegetable Masala"
+  },
+  {
+    "Outlet_ERP_ID": "KAZ584",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Divya KSD",
+    "Territory": "KASARGOD",
+    "Beats": "KASARAGOD",
+    "Outlets_Name": "VISWAS ASSOCIATES",
+    "Entity_Name": "SPICE POWDERS",
+    "Out_of_Stock": "None",
+    "Available_only_in_images": "Chilli Powder 100 g, Chilli Powder 250 g, Coriander Powder 100 g, Coriander Powder 250 g, Kashmiri Chilli Powder 100 g, Kashmiri Chilli Powder 250 g, Turmeric Powder 100 g, Turmeric Powder 250 g",
+    "Available_in_both_images_and_stock": "None",
+    "Not_in_both": "Black Pepper Powder, Chilli Powder 1 kg, Chilli Powder 500 g, Coriander Powder 1 kg, Coriander Powder 500 g, Crushed Chilli 100 g, Crushed Chilli 50 g, Cumin Powder, Dry Ginger Powder, Fennel Powder, Fenugreek Powder, Kashmiri Chilli Powder 1 kg, Kashmiri Chilli Powder 500 g, Turmeric Powder 1 kg, Turmeric Powder 500 g"
+  },
+  {
+    "Outlet_ERP_ID": "KAZ584",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Divya KSD",
+    "Territory": "KASARGOD",
+    "Beats": "KASARAGOD",
+    "Outlets_Name": "VISWAS ASSOCIATES",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Out_of_Stock": "None",
+    "Available_only_in_images": "Puttupodi 1 kg",
+    "Available_in_both_images_and_stock": "None",
+    "Not_in_both": "Appam/Idiyappam 1 kg, Appam/Idiyappam 500 g, Chemba puttu podi 500 g, Corn Puttu podi 500 g, Corn Puttupodi 1 kg, Double Roasted Rava 1 kg, Double roasted rava 500 g, Easy Paalappam Mix 1 kg, Easy paalappam mix 500 g, Malabar Pathiri Podi 1 kg, Malabar pathiri podi 500 g, Puttu podi 500 g, Ragi Puttu podi 500 g, Ragi Puttupodi 1 kg, Roasted Rice Powder 1 kg, Roasted rice powder 500 g, Single Roasted Rava 1 kg, Single roasted rava 500 g, Wheat Puttu podi 500 g, Wheat Puttupodi 1 kg"
+  },
+  {
+    "Outlet_ERP_ID": "v",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Sabitha",
+    "Territory": "CALICUT",
+    "Beats": "KAE - BEST",
+    "Outlets_Name": "Kozhikode Hypermarket Llp",
+    "Entity_Name": "MASALA",
+    "Out_of_Stock": "Chicken Kebab, Chutney Powder, Kadala Curry Masala, Meat Ularthu",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "Biryani Masala, Chicken Fry Masala, Chicken Masala, Chilli Chicken Masala, Egg Masala, Fish Fry Masala, Fish Masala, Garam Masala, Meat Masala, Mutton Masala, Pickle Powder, Rasam Powder, Sambar Powder, Spicy Chicken Masala, Vegetable Masala",
+    "Not_in_both": "None"
+  },
+  {
+    "Outlet_ERP_ID": "v",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Sabitha",
+    "Territory": "CALICUT",
+    "Beats": "KAE - BEST",
+    "Outlets_Name": "Kozhikode Hypermarket Llp",
+    "Entity_Name": "SPICE POWDERS",
+    "Out_of_Stock": "Chilli Powder 500 g, Coriander Powder 500 g, Dry Ginger Powder, Fennel Powder, Kashmiri Chilli Powder 500 g, Turmeric Powder 500 g",
+    "Available_only_in_images": "Chilli Powder 1 kg, Coriander Powder 1 kg",
+    "Available_in_both_images_and_stock": "Black Pepper Powder, Chilli Powder 100 g, Chilli Powder 250 g, Coriander Powder 100 g, Coriander Powder 250 g, Cumin Powder, Fenugreek Powder, Kashmiri Chilli Powder 100 g, Kashmiri Chilli Powder 250 g, Turmeric Powder 100 g, Turmeric Powder 250 g",
+    "Not_in_both": "Crushed Chilli 100 g, Crushed Chilli 50 g, Kashmiri Chilli Powder 1 kg, Turmeric Powder 1 kg"
+  },
+  {
+    "Outlet_ERP_ID": "v",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Sabitha",
+    "Territory": "CALICUT",
+    "Beats": "KAE - BEST",
+    "Outlets_Name": "Kozhikode Hypermarket Llp",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Out_of_Stock": "Chemba puttu podi 500 g, Corn Puttu podi 500 g, Malabar Pathiri Podi 1 kg, Malabar pathiri podi 500 g, Puttu podi 500 g, Ragi Puttu podi 500 g, Wheat Puttu podi 500 g",
+    "Available_only_in_images": "Appam/Idiyappam 1 kg, Puttupodi 1 kg",
+    "Available_in_both_images_and_stock": "Roasted Rice Powder 1 kg",
+    "Not_in_both": "Appam/Idiyappam 500 g, Corn Puttupodi 1 kg, Double Roasted Rava 1 kg, Double roasted rava 500 g, Easy Paalappam Mix 1 kg, Easy paalappam mix 500 g, Ragi Puttupodi 1 kg, Roasted rice powder 500 g, Single Roasted Rava 1 kg, Single roasted rava 500 g, Wheat Puttupodi 1 kg"
+  },
+  {
+    "Outlet_ERP_ID": "CLT034",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Vineetha",
+    "Territory": "CALICUT",
+    "Beats": "WS-BEST",
+    "Outlets_Name": "Bharath Supermarket",
+    "Entity_Name": "MASALA",
+    "Out_of_Stock": "Chicken Kebab, Chutney Powder, Egg Masala, Fish Fry Masala, Kadala Curry Masala, Meat Ularthu, Spicy Chicken Masala",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "Biryani Masala, Chicken Fry Masala, Chicken Masala, Chilli Chicken Masala, Fish Masala, Garam Masala, Meat Masala, Mutton Masala, Pickle Powder, Rasam Powder, Sambar Powder, Vegetable Masala",
+    "Not_in_both": "None"
+  },
+  {
+    "Outlet_ERP_ID": "CLT034",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Vineetha",
+    "Territory": "CALICUT",
+    "Beats": "WS-BEST",
+    "Outlets_Name": "Bharath Supermarket",
+    "Entity_Name": "SPICE POWDERS",
+    "Out_of_Stock": "Chilli Powder 500 g, Coriander Powder 500 g, Dry Ginger Powder, Fennel Powder, Kashmiri Chilli Powder 500 g, Turmeric Powder 500 g",
+    "Available_only_in_images": "Chilli Powder 1 kg, Coriander Powder 1 kg",
+    "Available_in_both_images_and_stock": "Black Pepper Powder, Chilli Powder 100 g, Chilli Powder 250 g, Coriander Powder 100 g, Coriander Powder 250 g, Cumin Powder, Fenugreek Powder, Kashmiri Chilli Powder 100 g, Kashmiri Chilli Powder 250 g, Turmeric Powder 100 g, Turmeric Powder 250 g",
+    "Not_in_both": "Crushed Chilli 100 g, Crushed Chilli 50 g, Kashmiri Chilli Powder 1 kg, Turmeric Powder 1 kg"
+  },
+  {
+    "Outlet_ERP_ID": "CLT034",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Vineetha",
+    "Territory": "CALICUT",
+    "Beats": "WS-BEST",
+    "Outlets_Name": "Bharath Supermarket",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Out_of_Stock": "Chemba puttu podi 500 g, Corn Puttu podi 500 g, Puttu podi 500 g, Ragi Puttu podi 500 g, Roasted Rice Powder 1 kg, Wheat Puttu podi 500 g",
+    "Available_only_in_images": "Appam/Idiyappam 1 kg, Puttupodi 1 kg",
+    "Available_in_both_images_and_stock": "None",
+    "Not_in_both": "Appam/Idiyappam 500 g, Corn Puttupodi 1 kg, Double Roasted Rava 1 kg, Double roasted rava 500 g, Easy Paalappam Mix 1 kg, Easy paalappam mix 500 g, Malabar Pathiri Podi 1 kg, Malabar pathiri podi 500 g, Ragi Puttupodi 1 kg, Roasted rice powder 500 g, Single Roasted Rava 1 kg, Single roasted rava 500 g, Wheat Puttupodi 1 kg"
+  },
+  {
+    "Outlet_ERP_ID": "MPM003",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Suja NH",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE MAL -PERITHALMANNA",
+    "Outlets_Name": "JAM JOOM PLAZA PVT LTD",
+    "Entity_Name": "MASALA",
+    "Out_of_Stock": "None",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "None",
+    "Not_in_both": "None"
+  },
+  {
+    "Outlet_ERP_ID": "MPM003",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Suja NH",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE MAL -PERITHALMANNA",
+    "Outlets_Name": "JAM JOOM PLAZA PVT LTD",
+    "Entity_Name": "SPICE POWDERS",
+    "Out_of_Stock": "None",
+    "Available_only_in_images": "None",
+    "Available_in_both_images_and_stock": "None",
+    "Not_in_both": "None"
+  },
+  {
+    "Outlet_ERP_ID": "MPM003",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Suja NH",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE MAL -PERITHALMANNA",
+    "Outlets_Name": "JAM JOOM PLAZA PVT LTD",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Out_of_Stock": "None",
+    "Available_only_in_images": "Appam/Idiyappam 500 g, Puttupodi 1 kg, Roasted Rice Powder 1 kg",
+    "Available_in_both_images_and_stock": "None",
+    "Not_in_both": "Appam/Idiyappam 1 kg, Chemba puttu podi 500 g, Corn Puttu podi 500 g, Corn Puttupodi 1 kg, Double Roasted Rava 1 kg, Double roasted rava 500 g, Easy Paalappam Mix 1 kg, Easy paalappam mix 500 g, Malabar Pathiri Podi 1 kg, Malabar pathiri podi 500 g, Puttu podi 500 g, Ragi Puttu podi 500 g, Ragi Puttupodi 1 kg, Roasted rice powder 500 g, Single Roasted Rava 1 kg, Single roasted rava 500 g, Wheat Puttu podi 500 g, Wheat Puttupodi 1 kg"
+  }
+];
+  </script>
+
+  <script>
+    const data = window.stockoutData;
+
+    const selects = {
+      territory: document.getElementById("territory"),
+      beats: document.getElementById("beats"),
+      outlet: document.getElementById("outlet"),
+      so: document.getElementById("so"),
+      entity: document.getElementById("entity"),
+      hierarchy: document.getElementById("hierarchy")
+    };
+    const tbody = document.getElementById("report-body");
+    const table = document.getElementById("data-table");
+    const cards = document.getElementById("card-view");
+
+    const params = new URLSearchParams(window.location.search);
+    const preselectedHierarchy = params.get("hierarchy") || "";
+    const preselectedName = params.get("name") || "";
+    const viewMode = params.get("view") || "";
+
+    function populate(select, key, baseData = data) {
+      const unique = [...new Set(baseData.map(d => d[key]).filter(Boolean))];
+      select.innerHTML = `<option value="">All ${key.replace('_', ' ')}</option>`;
+      unique.forEach(val => {
+        const opt = document.createElement("option");
+        opt.value = val;
+        opt.textContent = val;
+        select.appendChild(opt);
+      });
+    }
+
+    function groupByOutlet(rows) {
+      const map = {};
+      rows.forEach(row => {
+        const key = row.Outlet_ERP_ID;
+        if (!map[key]) map[key] = [];
+        map[key].push(row);
+      });
+      return Object.values(map);
+    }
+
+    function showStockInfo(rows) {
+      document.getElementById("main-view").style.display = "none";
+      document.getElementById("stock-info-view").style.display = "block";
+
+      const stockDetails = document.getElementById("stock-details");
+      stockDetails.innerHTML = rows.map(r => `
+        <tr>
+          <td style="padding: 10px; border: 1px solid #ccc;">${r.Entity_Name}</td>
+          <td style="padding: 10px; border: 1px solid #ccc;">${r.Out_of_Stock}</td>
+        </tr>
+      `).join("");
+    }
+
+    function goBack() {
+      document.getElementById("stock-info-view").style.display = "none";
+      document.getElementById("main-view").style.display = "block";
+    }
+
+    const accessControl = {
+      "Asha": "cf38874c0329c479",
+      "BIJISHA OV": "23e6406ed09e5e75",
+      "Beena Sunil Kumar": "fbfa1cc4ff3081e4",
+      "Deepthi": "dd9f8f634468b1ad",
+      "Jisha M": "c38bfe2d968af45c",
+      "Jyothi G": "5fc0a3d16d32aee9",
+      "Malavika": "cc4c174da49df399",
+      "Manju": "2d0ee12fd83c2c80",
+      "Praveena": "2b40ef9d0a340495",
+      "Priya Biju": "3b633de9aa042238",
+      "Rajani V": "a94f668286779a65",
+      "Remya": "32159798e9fa20a8",
+      "Renjini jude": "3de8e5a03e905fa8",
+      "Reshma VP": "2e2408cb73a20420",
+      "Sabitha": "232e240a22f4bc86",
+      "Sajitha. D": "a3468b3833e44c2d",
+      "Shabina": "b709c7747dca5ebb",
+      "Shilpa": "b380d6ae0c9cc2b1",
+      "Sindhu AV": "78fc339d88fc8f1e",
+      "Sujimol": "d228a69224851f66",
+      "Sumangala": "de5bab64882cf107",
+      "Sunitha": "7d9828b1fb1fcab7",
+      "Vineetha": "b535a09b62492e6b",
+      "Vineetha MD": "5f994e5af8bc075a"
+    };
+
+    const name = decodeURIComponent(params.get("name") || "");
+    const token = params.get("token");
+
+    if (name && (!token || accessControl[name] !== token)) {
+      document.body.innerHTML = `
+        <div style="text-align: center; padding: 50px;">
+          <h2 style="color: red;">Access Denied</h2>
+          <p>This report is protected. A valid token is required to view it.</p>
+        </div>`;
+      throw new Error("Access denied");
+    }
+
+
+    function render() {
+      const hierarchyKey = selects.hierarchy.value;
+      const isSO = hierarchyKey === "SO";
+      const isTSM = hierarchyKey === "TSM";
+      const filtered = data.filter(row =>
+        (!selects.territory.value || row.Territory === selects.territory.value) &&
+        (!selects.beats.value || row.Beats === selects.beats.value) &&
+        (!selects.outlet.value || row.Outlet_ERP_ID === selects.outlet.value) &&
+        (!selects.entity.value || row.Entity_Name === selects.entity.value) &&
+        (!selects.so.value || row[hierarchyKey] === selects.so.value)
+      );
+
+      document.querySelectorAll(".col-tsm").forEach(el => el.style.display = (isSO || isTSM) ? "none" : "table-cell");
+      document.querySelectorAll(".col-so").forEach(el => el.style.display = isSO ? "none" : "table-cell");
+
+      document.querySelectorAll(".col-available_only_in_images").forEach(el => el.style.display = isSO ? "none" : "table-cell");
+
+      tbody.innerHTML = "";
+      cards.innerHTML = "";
+
+      if (filtered.length > 0 && viewMode === "mobile") {
+        cards.classList.remove("hidden");
+        table.classList.add("hidden");
+
+        const grouped = groupByOutlet(filtered);
+
+        grouped.forEach(group => {
+          const info = group[0];
+          const card = document.createElement("div");
+          card.className = "card";
+          card.innerHTML = `
+            <div><strong>Beat:</strong> ${info.Beats}</div>
+            <div><strong>Outlet ERP ID:</strong> ${info.Outlet_ERP_ID}</div>
+            <div><strong>Outlet Name:</strong> ${info.Outlets_Name}</div>
+            <button>View Stock Info</button>
+          `;
+          
+          const button = card.querySelector("button");
+          button.style.cssText = `
+            margin-top: 10px;
+            padding: 10px 20px;
+            background-color: #2c3e50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+          `;
+          button.addEventListener("click", () => showStockInfo(group));
+          
+          cards.appendChild(card);
+        });
+      } else {
+        table.classList.remove("hidden");
+        cards.classList.add("hidden");
+        filtered.forEach(row => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            ${!(isSO || isTSM) ? `<td class="col-tsm">${row.TSM}</td>` : ""}
+            ${!isSO ? `<td class="col-so">${row.SO}</td>` : ""}
+            <td>${row.Territory}</td>
+            <td>${row.Beats}</td>
+            <td>${row.Outlet_ERP_ID}</td>
+            <td>${row.Outlets_Name}</td>
+            <td>${row.Entity_Name}</td>
+            <td>${row.Out_of_Stock}</td>
+            ${!isSO ? `<td class="col-available_only_in_images">${row.Available_only_in_images}</td>` : ""}`;
+          tbody.appendChild(tr);
+        });
+      }
+
+      // ✅ This triggers shelf talker & facings when an outlet is selected
+      if (selects.outlet.value) {
+        updateShelfInsights(selects.outlet.value);
+      }
+    }
+
+    function initializeFilters() {
+      selects.hierarchy.addEventListener("change", () => {
+        const label = document.getElementById("so-label");
+        const selected = selects.hierarchy.value || 'SO/TSM';
+        label.innerHTML = `${selected}:<select id="so"><option value="">All ${selected}</option></select>`;
+        selects.so = document.querySelector("#so");
+        populate(selects.so, selected, data);
+        selects.so.addEventListener("change", render);
+        render();
+      });
+
+      selects.territory.addEventListener("change", () => {
+        const filtered = data.filter(d => !selects.territory.value || d.Territory === selects.territory.value);
+        populate(selects.beats, "Beats", filtered);
+        populate(selects.outlet, "Outlet_ERP_ID", filtered);
+        populate(selects.entity, "Entity_Name", filtered);
+        render();
+      });
+
+      selects.beats.addEventListener("change", () => {
+        const filtered = data.filter(d =>
+          (!selects.territory.value || d.Territory === selects.territory.value) &&
+          (!selects.beats.value || d.Beats === selects.beats.value));
+        populate(selects.outlet, "Outlet_ERP_ID", filtered);
+        populate(selects.entity, "Entity_Name", filtered);
+        render();
+      });
+
+      selects.outlet.addEventListener("change", render);
+      selects.entity.addEventListener("change", render);
+
+      populate(selects.territory, "Territory");
+      populate(selects.beats, "Beats");
+      populate(selects.outlet, "Outlet_ERP_ID");
+      populate(selects.so, "SO");
+      populate(selects.entity, "Entity_Name");
+
+      render();
+    }
+
+    if (preselectedHierarchy && preselectedName) {
+      document.getElementById("filter-section").style.display = "none";
+      document.getElementById("report-title").textContent = `SKU Stockout Report – ${preselectedName} (${preselectedHierarchy})`;
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      selects.hierarchy.value = preselectedHierarchy || "";
+      if (preselectedHierarchy && preselectedName) {
+        const label = document.getElementById("so-label");
+        label.innerHTML = `${preselectedHierarchy}:<select id="so"><option value="">All ${preselectedHierarchy}</option></select>`;
+        selects.so = document.querySelector("#so");
+        const init = () => {
+          populate(selects.so, preselectedHierarchy, data);
+          selects.so.value = preselectedName;
+          render();
+        };
+        setTimeout(init, 50);
+      } else {
+        initializeFilters();
+      }
+    });
+  </script>
+
+  <div id="shelf-talkers-section" style="display: none; max-width: 900px; margin: 40px auto;">
+    <h3>Shelf Talkers</h3>
+    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+      <tbody id="shelf-talkers-body"></tbody>
+    </table>
+  </div>
+
+  <div id="facings-section" style="display: none; max-width: 900px; margin: 40px auto;">
+    <h3>Facings Summary</h3>
+    <div id="total-facing-summary"></div>
+    <div id="facings-masala-table"></div>
+    <div id="facings-spice-table" style="margin-top: 30px;"></div>
+    <div id="facings-breakfast-table" style="margin-top: 30px;"></div>
+  </div>
+  
+  <script>
+    window.shelfInsightsData = [
+  {
+    "Outlet_ERP_ID": "MPM792",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Rajani V",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE MAL -MANJERI",
+    "Outlets_Name": "HYPER BUDGET SUPERMARKET MANJERI",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/4b733a1f4a9b42da95b94c4df0466408",
+    "Shelf_Talkers": [
+      "MRP: ₹39 KITCHEN TREASURES",
+      "KITCHEN TREASURES CHICKEN MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES MEAT MASALA MRP 53/- NOW @ ORP 47/-"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chilli Powder 1 kg": 2,
+      "Kitchen Treasures Coriander Powder 1 kg": 1,
+      "Kitchen Treasures Black Pepper Powder": 2,
+      "Kitchen Treasures Cumin Powder": 1,
+      "Kitchen Treasures Chilli Powder 250 g": 3,
+      "Kitchen Treasures Chilli Powder 100 g": 2,
+      "Kitchen Treasures Coriander Powder 250 g": 2,
+      "Kitchen Treasures Coriander Powder 100 g": 1,
+      "Kitchen Treasures Kashmiri Chilli Powder 250 g": 1,
+      "Kitchen Treasures Kashmiri Chilli Powder 100 g": 1,
+      "Kitchen Treasures Turmeric Powder 250 g": 2,
+      "Kitchen Treasures Turmeric Powder 100 g": 1
+    },
+    "Total_Facings": 20
+  },
+  {
+    "Outlet_ERP_ID": "MPM792",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Rajani V",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE MAL -MANJERI",
+    "Outlets_Name": "HYPER BUDGET SUPERMARKET MANJERI",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/ae0b345762254fbd892639782be7a3c6",
+    "Shelf_Talkers": [
+      "MRP: ₹39 KITCHEN TREASURES CHILLI POWDER 100G"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chilli Powder 1 kg": 1,
+      "Kitchen Treasures Chilli Powder 250 g": 2,
+      "Kitchen Treasures Chilli Powder 100 g": 3,
+      "Kitchen Treasures Kashmiri Chilli Powder 250 g": 2,
+      "Kitchen Treasures Kashmiri Chilli Powder 100 g": 2,
+      "Kitchen Treasures Turmeric Powder 250 g": 2,
+      "Kitchen Treasures Turmeric Powder 100 g": 2,
+      "Kitchen Treasures Black Pepper Powder": 1,
+      "Kitchen Treasures Cumin Powder": 1
+    },
+    "Total_Facings": 16
+  },
+  {
+    "Outlet_ERP_ID": "MPM792",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Rajani V",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE MAL -MANJERI",
+    "Outlets_Name": "HYPER BUDGET SUPERMARKET MANJERI",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/b4f0217426014043a4852eb1668032a3",
+    "Shelf_Talkers": [
+      "KITCHEN TREASURES CHICKEN MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES MEAT MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES INTRODUCING OUR NEXT-LEVEL CRUSHED CHILLI"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 3,
+      "Kitchen Treasures Chilli Chicken Masala": 2,
+      "Kitchen Treasures Meat Masala": 4,
+      "Kitchen Treasures Fish Masala": 2,
+      "Kitchen Treasures Chicken Fry Masala": 1,
+      "Kitchen Treasures Sambar Powder": 3,
+      "Kitchen Treasures Rasam Powder": 2,
+      "Kitchen Treasures Pickle Powder": 1,
+      "Kitchen Treasures Vegetable Masala": 1,
+      "Kitchen Treasures Biryani Masala": 1,
+      "Kitchen Treasures Garam Masala": 1,
+      "Kitchen Treasures Mutton Masala": 1
+    },
+    "Total_Facings": 23
+  },
+  {
+    "Outlet_ERP_ID": "MPM792",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Rajani V",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE MAL -MANJERI",
+    "Outlets_Name": "HYPER BUDGET SUPERMARKET MANJERI",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/180d07a885bb4d0b91532cf395cfea9b",
+    "Shelf_Talkers": [
+      "MRP: ₹53.50 NOW ₹39"
+    ],
+    "Facings": {
+      "Kitchen Treasures Meat Masala": 1,
+      "Kitchen Treasures Rasam Powder": 1,
+      "Kitchen Treasures Egg Masala": 1,
+      "Kitchen Treasures Biryani Masala": 2
+    },
+    "Total_Facings": 5
+  },
+  {
+    "Outlet_ERP_ID": "MPM792",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Rajani V",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE MAL -MANJERI",
+    "Outlets_Name": "HYPER BUDGET SUPERMARKET MANJERI",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/9367504d20724e30bd0c93f5de16fe7a",
+    "Shelf_Talkers": [
+      "MRP: ₹69 KITCHEN TREASURES PUTTU PODI 1KG",
+      "Healthy is Delicious Now"
+    ],
+    "Facings": {
+      "Kitchen Treasures Puttu Podi 1 kg": 3,
+      "Kitchen Treasures Roasted Rice Powder": 2,
+      "Kitchen Treasures Appam/Idiyappam": 2
+    },
+    "Total_Facings": 7
+  },
+  {
+    "Outlet_ERP_ID": "MPM792",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Rajani V",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE MAL -MANJERI",
+    "Outlets_Name": "HYPER BUDGET SUPERMARKET MANJERI",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/d199d75c481b4498968230b247819b6e",
+    "Shelf_Talkers": [
+      "Healthy is Delicious Now",
+      "MRP: ₹59"
+    ],
+    "Facings": {
+      "Kitchen Treasures Roasted Rice Powder 1kg": 2,
+      "Kitchen Treasures Appam/Idiyappam 1kg": 1,
+      "Kitchen Treasures Easy Paalappam Mix 1kg": 1,
+      "Kitchen Treasures Puttu Podi 1kg": 1
+    },
+    "Total_Facings": 5
+  },
+  {
+    "Outlet_ERP_ID": "CLT792",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Jisha M",
+    "Territory": "CALICUT",
+    "Beats": "KAE CLT 6 NAS",
+    "Outlets_Name": "Day Mart Naduvannure",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/75687a3e7ad84149948a118b2a0d8ef4",
+    "Shelf_Talkers": [
+      "KITCHEN TREASURES CHICKEN MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES MEAT MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES INTRODUCING OUR NEXT-LEVEL CRUSHED CHILLI"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 2,
+      "Kitchen Treasures Meat Masala": 2,
+      "Kitchen Treasures Fish Masala": 1
+    },
+    "Total_Facings": 5
+  },
+  {
+    "Outlet_ERP_ID": "KLM537",
+    "TSM": "Renjith Kumar",
+    "SO": "Jyothi G",
+    "Territory": "KOLLAM",
+    "Beats": "KAE-SPARK",
+    "Outlets_Name": "Anugraha Home Mart",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/37b4fe9eaa13491c88f4f49924139f0d",
+    "Shelf_Talkers": [],
+    "Facings": {},
+    "Total_Facings": 0
+  },
+  {
+    "Outlet_ERP_ID": "KLM537",
+    "TSM": "Renjith Kumar",
+    "SO": "Jyothi G",
+    "Territory": "KOLLAM",
+    "Beats": "KAE-SPARK",
+    "Outlets_Name": "Anugraha Home Mart",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/a6e15a38b66d4753990f44bbe4729159",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 3,
+      "Kitchen Treasures Chilli Chicken Masala": 2,
+      "Kitchen Treasures Meat Masala": 4,
+      "Kitchen Treasures Fish Masala": 2,
+      "Kitchen Treasures Chicken Fry Masala": 2,
+      "Kitchen Treasures Sambar Powder": 3,
+      "Kitchen Treasures Rasam Powder": 1,
+      "Kitchen Treasures Vegetable Masala": 1,
+      "Kitchen Treasures Garam Masala": 1,
+      "Kitchen Treasures Biryani Masala": 1
+    },
+    "Total_Facings": 20
+  },
+  {
+    "Outlet_ERP_ID": "KLM537",
+    "TSM": "Renjith Kumar",
+    "SO": "Jyothi G",
+    "Territory": "KOLLAM",
+    "Beats": "KAE-SPARK",
+    "Outlets_Name": "Anugraha Home Mart",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/ed2ff1d5e5ff4144ada3e776c341b365",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 4,
+      "Kitchen Treasures Chilli Chicken Masala": 2,
+      "Kitchen Treasures Meat Masala": 3,
+      "Kitchen Treasures Fish Masala": 2,
+      "Kitchen Treasures Chicken Fry Masala": 2,
+      "Kitchen Treasures Sambar Powder": 3,
+      "Kitchen Treasures Rasam Powder": 2,
+      "Kitchen Treasures Biryani Masala": 1
+    },
+    "Total_Facings": 19
+  },
+  {
+    "Outlet_ERP_ID": "KLM537",
+    "TSM": "Renjith Kumar",
+    "SO": "Jyothi G",
+    "Territory": "KOLLAM",
+    "Beats": "KAE-SPARK",
+    "Outlets_Name": "Anugraha Home Mart",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/911c11f3b3e14c3c93e262fde090f3d5",
+    "Shelf_Talkers": [],
+    "Facings": {},
+    "Total_Facings": 0
+  },
+  {
+    "Outlet_ERP_ID": "KLM537",
+    "TSM": "Renjith Kumar",
+    "SO": "Jyothi G",
+    "Territory": "KOLLAM",
+    "Beats": "KAE-SPARK",
+    "Outlets_Name": "Anugraha Home Mart",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/b95626ff24c140dcac18ab949eb3050f",
+    "Shelf_Talkers": [
+      "KITCHEN TREASURES CHICKEN MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES MEAT MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES INTRODUCING OUR NEXT-LEVEL CRUSHED CHILLI"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chilli Powder 1 kg": 2,
+      "Kitchen Treasures Coriander Powder 1 kg": 1,
+      "Kitchen Treasures Black Pepper Powder": 3,
+      "Kitchen Treasures Cumin Powder": 2,
+      "Kitchen Treasures Fenugreek Powder": 1,
+      "Kitchen Treasures Chilli Powder 250 g": 2,
+      "Kitchen Treasures Chilli Powder 100 g": 1,
+      "Kitchen Treasures Coriander Powder 250 g": 2,
+      "Kitchen Treasures Coriander Powder 100 g": 1,
+      "Kitchen Treasures Kashmiri Chilli Powder 250 g": 2,
+      "Kitchen Treasures Kashmiri Chilli Powder 100 g": 1,
+      "Kitchen Treasures Turmeric Powder 250 g": 2,
+      "Kitchen Treasures Turmeric Powder 100 g": 1
+    },
+    "Total_Facings": 24
+  },
+  {
+    "Outlet_ERP_ID": "KLM537",
+    "TSM": "Renjith Kumar",
+    "SO": "Jyothi G",
+    "Territory": "KOLLAM",
+    "Beats": "KAE-SPARK",
+    "Outlets_Name": "Anugraha Home Mart",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/54168e96f0654682b5a13cce93128b88",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Chilli Powder 1 kg": 2,
+      "Kitchen Treasures Coriander Powder 1 kg": 1,
+      "Kitchen Treasures Black Pepper Powder": 3,
+      "Kitchen Treasures Cumin Powder": 2,
+      "Kitchen Treasures Chilli Powder 250 g": 4,
+      "Kitchen Treasures Chilli Powder 100 g": 3,
+      "Kitchen Treasures Coriander Powder 250 g": 2,
+      "Kitchen Treasures Coriander Powder 100 g": 2,
+      "Kitchen Treasures Kashmiri Chilli Powder 250 g": 2,
+      "Kitchen Treasures Kashmiri Chilli Powder 100 g": 2,
+      "Kitchen Treasures Turmeric Powder 250 g": 3,
+      "Kitchen Treasures Turmeric Powder 100 g": 3
+    },
+    "Total_Facings": 30
+  },
+  {
+    "Outlet_ERP_ID": "TCR639",
+    "TSM": "Harishankar TG",
+    "SO": "Sunitha",
+    "Territory": "THRISSUR",
+    "Beats": "KAE TCR-MARIYA",
+    "Outlets_Name": "Kalyan Hypermarket Thrissur",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/c0b474d2400f47688a06de8c261e29e6",
+    "Shelf_Talkers": [
+      "MRP: ₹69 KITCHEN TREASURES PUTTU PODI 1KG"
+    ],
+    "Facings": {
+      "Kitchen Treasures Puttu Podi 1kg": 1,
+      "Kitchen Treasures Appam/Idiyappam 1kg": 2,
+      "Kitchen Treasures Roasted Rice Powder 1kg": 1,
+      "Kitchen Treasures Easy Paalappam Mix 1kg": 2
+    },
+    "Total_Facings": 6
+  },
+  {
+    "Outlet_ERP_ID": "TCR639",
+    "TSM": "Harishankar TG",
+    "SO": "Sunitha",
+    "Territory": "THRISSUR",
+    "Beats": "KAE TCR-MARIYA",
+    "Outlets_Name": "Kalyan Hypermarket Thrissur",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/3b2acc952e19466da7e16bd5ebb1e47a",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Ragi Puttu Podi": 1,
+      "Kitchen Treasures Wheat Puttu Podi": 1,
+      "Kitchen Treasures Corn Puttu Podi": 1
+    },
+    "Total_Facings": 3
+  },
+  {
+    "Outlet_ERP_ID": "TCR639",
+    "TSM": "Harishankar TG",
+    "SO": "Sunitha",
+    "Territory": "THRISSUR",
+    "Beats": "KAE TCR-MARIYA",
+    "Outlets_Name": "Kalyan Hypermarket Thrissur",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/d1c95683fee641b5b4b5c20233ef6c56",
+    "Shelf_Talkers": [],
+    "Facings": {},
+    "Total_Facings": 0
+  },
+  {
+    "Outlet_ERP_ID": "TCR639",
+    "TSM": "Harishankar TG",
+    "SO": "Sunitha",
+    "Territory": "THRISSUR",
+    "Beats": "KAE TCR-MARIYA",
+    "Outlets_Name": "Kalyan Hypermarket Thrissur",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/625432cfde634286b730fa1f990a48f7",
+    "Shelf_Talkers": [
+      "KITCHEN TREASURES 100% CORIANDER POWDER 79",
+      "KITCHEN TREASURES 100% KASHMIRI CHILLI 149",
+      "KITCHEN TREASURES 100% TURMERIC POWDER 39"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chilli Powder 250 g": 2,
+      "Kitchen Treasures Chilli Powder 100 g": 1,
+      "Kitchen Treasures Coriander Powder 250 g": 2,
+      "Kitchen Treasures Coriander Powder 100 g": 1,
+      "Kitchen Treasures Kashmiri Chilli Powder 250 g": 2,
+      "Kitchen Treasures Kashmiri Chilli Powder 100 g": 1,
+      "Kitchen Treasures Turmeric Powder 250 g": 2,
+      "Kitchen Treasures Turmeric Powder 100 g": 1
+    },
+    "Total_Facings": 12
+  },
+  {
+    "Outlet_ERP_ID": "TCR639",
+    "TSM": "Harishankar TG",
+    "SO": "Sunitha",
+    "Territory": "THRISSUR",
+    "Beats": "KAE TCR-MARIYA",
+    "Outlets_Name": "Kalyan Hypermarket Thrissur",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/93939243972d4d4784482210fe475077",
+    "Shelf_Talkers": [
+      "Big Savings. 365 Days. KITCHEN TREASURES Turmeric Powder 250 g Price: 29"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chilli Powder 1 kg": 1,
+      "Kitchen Treasures Coriander Powder 1 kg": 1,
+      "Kitchen Treasures Chilli Powder 250 g": 2,
+      "Kitchen Treasures Chilli Powder 100 g": 2,
+      "Kitchen Treasures Coriander Powder 250 g": 2,
+      "Kitchen Treasures Coriander Powder 100 g": 2,
+      "Kitchen Treasures Kashmiri Chilli Powder 250 g": 2,
+      "Kitchen Treasures Kashmiri Chilli Powder 100 g": 2,
+      "Kitchen Treasures Turmeric Powder 250 g": 2,
+      "Kitchen Treasures Turmeric Powder 100 g": 2
+    },
+    "Total_Facings": 18
+  },
+  {
+    "Outlet_ERP_ID": "TCR639",
+    "TSM": "Harishankar TG",
+    "SO": "Sunitha",
+    "Territory": "THRISSUR",
+    "Beats": "KAE TCR-MARIYA",
+    "Outlets_Name": "Kalyan Hypermarket Thrissur",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/87c2f5ba5e0c43f38612f84e94b69a7a",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Crushed Chilli 100 g": 2
+    },
+    "Total_Facings": 2
+  },
+  {
+    "Outlet_ERP_ID": "TCR639",
+    "TSM": "Harishankar TG",
+    "SO": "Sunitha",
+    "Territory": "THRISSUR",
+    "Beats": "KAE TCR-MARIYA",
+    "Outlets_Name": "Kalyan Hypermarket Thrissur",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/14de51343e5e4e55b1c92f0d1cf43a7b",
+    "Shelf_Talkers": [
+      "KITCHEN TREASURES CHICKEN MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES MEAT MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES INTRODUCING OUR NEXT-LEVEL CRUSHED CHILLI"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 2,
+      "Kitchen Treasures Chilli Chicken Masala": 1,
+      "Kitchen Treasures Meat Masala": 2,
+      "Kitchen Treasures Meat Ularthu": 1,
+      "Kitchen Treasures Fish Masala": 2,
+      "Kitchen Treasures Pickle Powder": 1
+    },
+    "Total_Facings": 9
+  },
+  {
+    "Outlet_ERP_ID": "TCR639",
+    "TSM": "Harishankar TG",
+    "SO": "Sunitha",
+    "Territory": "THRISSUR",
+    "Beats": "KAE TCR-MARIYA",
+    "Outlets_Name": "Kalyan Hypermarket Thrissur",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/63737ddf95614a6890404d43d0fe66f0",
+    "Shelf_Talkers": [
+      "Big Savings. 365 Days. KITCHEN TREASURES 33",
+      "Big Savings. 365 Days. KITCHEN TREASURES 39"
+    ],
+    "Facings": {
+      "Kitchen Treasures Meat Ularthu": 1,
+      "Kitchen Treasures Fish Masala": 1,
+      "Kitchen Treasures Rasam Powder": 1,
+      "Kitchen Treasures Pickle Powder": 1,
+      "Kitchen Treasures Garam Masala": 2
+    },
+    "Total_Facings": 6
+  },
+  {
+    "Outlet_ERP_ID": "TCR639",
+    "TSM": "Harishankar TG",
+    "SO": "Sunitha",
+    "Territory": "THRISSUR",
+    "Beats": "KAE TCR-MARIYA",
+    "Outlets_Name": "Kalyan Hypermarket Thrissur",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/f63d5eb138774cab820556909a70aabb",
+    "Shelf_Talkers": [
+      "KITCHEN TREASURES PICKLE POWDER MRP 39/-",
+      "KITCHEN TREASURES RASAM POWDER MRP 33/-",
+      "KITCHEN TREASURES EGG MASALA MRP 33/-",
+      "KITCHEN TREASURES BIRYANI MASALA MRP 33/-"
+    ],
+    "Facings": {
+      "Kitchen Treasures Pickle Powder": 1,
+      "Kitchen Treasures Rasam Powder": 1,
+      "Kitchen Treasures Egg Masala": 1,
+      "Kitchen Treasures Biryani Masala": 1
+    },
+    "Total_Facings": 4
+  },
+  {
+    "Outlet_ERP_ID": "MPMN1467",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Deepthi",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE -ABHILASH",
+    "Outlets_Name": "AAK MALL LLP",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/537df3e1f34e4ac7a2689c943ef41ec8",
+    "Shelf_Talkers": [
+      "MRP: ₹69 KITCHEN TREASURES PUTTU PODI 1KG",
+      "Puttu Podi MRP:- 83/- BP ₹71",
+      "Rice Powder MRP:- 83/- BP ₹71/-"
+    ],
+    "Facings": {
+      "Kitchen Treasures Puttu Podi 1 kg": 3,
+      "Kitchen Treasures Roasted Rice Powder 1 kg": 2,
+      "Kitchen Treasures Appam/Idiyappam 500 g": 1
+    },
+    "Total_Facings": 6
+  },
+  {
+    "Outlet_ERP_ID": "MPMN1467",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Deepthi",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE -ABHILASH",
+    "Outlets_Name": "AAK MALL LLP",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/a13b6eb2ef7f4fa9b5ed882058a1997a",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Puttu Podi 1 kg": 3,
+      "Kitchen Treasures Wheat Puttupodi 1 kg": 2,
+      "Kitchen Treasures Corn Puttupodi 1 kg": 1,
+      "Kitchen Treasures Appam/Idiyappam 1 kg": 2,
+      "Kitchen Treasures Malabar Pathiri Podi 1 kg": 1,
+      "Kitchen Treasures Roasted Rice Powder 1 kg": 1
+    },
+    "Total_Facings": 10
+  },
+  {
+    "Outlet_ERP_ID": "MPMN1467",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Deepthi",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE -ABHILASH",
+    "Outlets_Name": "AAK MALL LLP",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/2042f5d0485c43ed8fc703ad753295d2",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 3,
+      "Kitchen Treasures Chilli Chicken Masala": 2,
+      "Kitchen Treasures Meat Masala": 4,
+      "Kitchen Treasures Fish Masala": 2,
+      "Kitchen Treasures Chicken Fry Masala": 1,
+      "Kitchen Treasures Sambar Powder": 3,
+      "Kitchen Treasures Biryani Masala": 1
+    },
+    "Total_Facings": 16
+  },
+  {
+    "Outlet_ERP_ID": "MPMN1467",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Deepthi",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE -ABHILASH",
+    "Outlets_Name": "AAK MALL LLP",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/55523f3a7f6144328d34ef87e22705f3",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 3,
+      "Kitchen Treasures Chilli Chicken Masala": 2,
+      "Kitchen Treasures Meat Masala": 4,
+      "Kitchen Treasures Fish Masala": 2,
+      "Kitchen Treasures Chicken Fry Masala": 1,
+      "Kitchen Treasures Sambar Powder": 2,
+      "Kitchen Treasures Biryani Masala": 1
+    },
+    "Total_Facings": 15
+  },
+  {
+    "Outlet_ERP_ID": "MPMN1467",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Deepthi",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE -ABHILASH",
+    "Outlets_Name": "AAK MALL LLP",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/6e809cb35a6b4c8281e16cbb02d8b509",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Fennel Powder": 5,
+      "Kitchen Treasures Black Pepper Powder": 3
+    },
+    "Total_Facings": 8
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_72193908",
+    "TSM": "Ahammed Vaseem",
+    "SO": "BIJISHA OV",
+    "Territory": "KANNUR",
+    "Beats": "KAE KNR-Thaliparamba",
+    "Outlets_Name": "Shopprix Super Center",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/95ec865b67404bcaab4d2627c18aa5fb",
+    "Shelf_Talkers": [
+      "MRP: ₹69 KITCHEN TREASURES PUTTU PODI 1KG",
+      "Puttu Podi MRP:- 83/- BP ₹71"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 3,
+      "Kitchen Treasures Chilli Chicken Masala": 2,
+      "Kitchen Treasures Meat Masala": 4,
+      "Kitchen Treasures Fish Masala": 2,
+      "Kitchen Treasures Chicken Fry Masala": 1,
+      "Kitchen Treasures Sambar Powder": 3,
+      "Kitchen Treasures Biryani Masala": 1
+    },
+    "Total_Facings": 16
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_72193908",
+    "TSM": "Ahammed Vaseem",
+    "SO": "BIJISHA OV",
+    "Territory": "KANNUR",
+    "Beats": "KAE KNR-Thaliparamba",
+    "Outlets_Name": "Shopprix Super Center",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/befd88a100124c32b3e208e43df9278d",
+    "Shelf_Talkers": [
+      "MRP: ₹69 KITCHEN TREASURES PUTTU PODI 1KG",
+      "Puttu Podi MRP:- 83/- BP ₹71",
+      "Rice Powder MRP:- 83/- BP ₹71/-"
+    ],
+    "Facings": {
+      "Kitchen Treasures Puttu Podi 1kg": 3,
+      "Kitchen Treasures Appam/Idiyappam 500 g": 2,
+      "Kitchen Treasures Roasted Rice Powder 500 g": 2
+    },
+    "Total_Facings": 7
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_72193908",
+    "TSM": "Ahammed Vaseem",
+    "SO": "BIJISHA OV",
+    "Territory": "KANNUR",
+    "Beats": "KAE KNR-Thaliparamba",
+    "Outlets_Name": "Shopprix Super Center",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/cb6008273ee54f85b19d30ecc92108da",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Puttu Podi 1 kg": 6
+    },
+    "Total_Facings": 6
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_72193908",
+    "TSM": "Ahammed Vaseem",
+    "SO": "BIJISHA OV",
+    "Territory": "KANNUR",
+    "Beats": "KAE KNR-Thaliparamba",
+    "Outlets_Name": "Shopprix Super Center",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/6491a9b1a7f24aaaae745fdbc3ac7011",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Puttu Podi 1kg": 3,
+      "Kitchen Treasures Appam/Idiyappam 1kg": 2
+    },
+    "Total_Facings": 5
+  },
+  {
+    "Outlet_ERP_ID": "PATHANAMTHITTA00062",
+    "TSM": "Renjith Kumar",
+    "SO": "Shilpa",
+    "Territory": "PATHANAMTHITTA",
+    "Beats": "NEW ALANKAR - PTA",
+    "Outlets_Name": "Alankar Super Market",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/4e32f00932394660a159fd943b854015",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Puttupodi 1 kg": 2,
+      "Kitchen Treasures Wheat Puttupodi 1 kg": 2,
+      "Kitchen Treasures Chemba Puttupodi 500 g": 2,
+      "Kitchen Treasures Appam/Idiyappam 1 kg": 1,
+      "Kitchen Treasures Malabar Pathiri Podi 1 kg": 1,
+      "Kitchen Treasures Roasted Rice Powder 1 kg": 2,
+      "Kitchen Treasures Easy Paalappam Mix 1 kg": 1
+    },
+    "Total_Facings": 11
+  },
+  {
+    "Outlet_ERP_ID": "PATHANAMTHITTA00062",
+    "TSM": "Renjith Kumar",
+    "SO": "Shilpa",
+    "Territory": "PATHANAMTHITTA",
+    "Beats": "NEW ALANKAR - PTA",
+    "Outlets_Name": "Alankar Super Market",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/2efc2fe6d55b42658a65f22120f7dd73",
+    "Shelf_Talkers": [
+      "KITCHEN TREASURES CHICKEN MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES MEAT MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES INTRODUCING OUR NEXT-LEVEL CRUSHED CHILLI"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 2,
+      "Kitchen Treasures Meat Masala": 1,
+      "Kitchen Treasures Meat Ularthu": 1,
+      "Kitchen Treasures Fish Masala": 1,
+      "Kitchen Treasures Fish Fry Masala": 1,
+      "Kitchen Treasures Mutton Masala": 1,
+      "Kitchen Treasures Sambar Powder": 2,
+      "Kitchen Treasures Rasam Powder": 1,
+      "Kitchen Treasures Pickle Powder": 1,
+      "Kitchen Treasures Vegetable Masala": 1,
+      "Kitchen Treasures Garam Masala": 1,
+      "Kitchen Treasures Biryani Masala": 1
+    },
+    "Total_Facings": 15
+  },
+  {
+    "Outlet_ERP_ID": "PATHANAMTHITTA00062",
+    "TSM": "Renjith Kumar",
+    "SO": "Shilpa",
+    "Territory": "PATHANAMTHITTA",
+    "Beats": "NEW ALANKAR - PTA",
+    "Outlets_Name": "Alankar Super Market",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/7b1100e57c0342ac8f2883a5e16a4ccc",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Chilli Powder 250 g": 2,
+      "Kitchen Treasures Chilli Powder 100 g": 1,
+      "Kitchen Treasures Coriander Powder 250 g": 2,
+      "Kitchen Treasures Coriander Powder 100 g": 1,
+      "Kitchen Treasures Kashmiri Chilli Powder 250 g": 1,
+      "Kitchen Treasures Kashmiri Chilli Powder 100 g": 1,
+      "Kitchen Treasures Turmeric Powder 250 g": 1,
+      "Kitchen Treasures Turmeric Powder 100 g": 1
+    },
+    "Total_Facings": 10
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_80058288",
+    "TSM": "Renjith Kumar",
+    "SO": "Remya",
+    "Territory": "TRIVANDRUM",
+    "Beats": "OACHIRA TRADERS",
+    "Outlets_Name": "Oachira Trader",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/bce4107b5d344f01b08494afdd10e535",
+    "Shelf_Talkers": [
+      "KITCHEN TREASURES CHICKEN MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES MEAT MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES INTRODUCING OUR NEXT-LEVEL CRUSHED CHILLI"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 3,
+      "Kitchen Treasures Chilli Chicken Masala": 1,
+      "Kitchen Treasures Meat Masala": 2,
+      "Kitchen Treasures Fish Masala": 1,
+      "Kitchen Treasures Sambar Powder": 2,
+      "Kitchen Treasures Rasam Powder": 1,
+      "Kitchen Treasures Pickle Powder": 1,
+      "Kitchen Treasures Biryani Masala": 1
+    },
+    "Total_Facings": 12
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_80058288",
+    "TSM": "Renjith Kumar",
+    "SO": "Remya",
+    "Territory": "TRIVANDRUM",
+    "Beats": "OACHIRA TRADERS",
+    "Outlets_Name": "Oachira Trader",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/81c1635ce184470ca1c7d2466c843961",
+    "Shelf_Talkers": [
+      "KITCHEN TREASURES CHICKEN MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES MEAT MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES INTRODUCING OUR NEXT-LEVEL CRUSHED CHILLI"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 3,
+      "Kitchen Treasures Chilli Chicken Masala": 1,
+      "Kitchen Treasures Meat Masala": 2,
+      "Kitchen Treasures Fish Masala": 1,
+      "Kitchen Treasures Sambar Powder": 2,
+      "Kitchen Treasures Rasam Powder": 1,
+      "Kitchen Treasures Pickle Powder": 1,
+      "Kitchen Treasures Biryani Masala": 1
+    },
+    "Total_Facings": 12
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_80058288",
+    "TSM": "Renjith Kumar",
+    "SO": "Remya",
+    "Territory": "TRIVANDRUM",
+    "Beats": "OACHIRA TRADERS",
+    "Outlets_Name": "Oachira Trader",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/ed4f86749fab4db19d87c9f517d9bd56",
+    "Shelf_Talkers": [
+      "KITCHEN TREASURES CHICKEN MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES MEAT MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES INTRODUCING OUR NEXT-LEVEL CRUSHED CHILLI"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 3,
+      "Kitchen Treasures Meat Masala": 2,
+      "Kitchen Treasures Fish Masala": 2,
+      "Kitchen Treasures Sambar Powder": 3,
+      "Kitchen Treasures Rasam Powder": 1,
+      "Kitchen Treasures Garam Masala": 1,
+      "Kitchen Treasures Vegetable Masala": 1,
+      "Kitchen Treasures Biryani Masala": 1
+    },
+    "Total_Facings": 14
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_80058288",
+    "TSM": "Renjith Kumar",
+    "SO": "Remya",
+    "Territory": "TRIVANDRUM",
+    "Beats": "OACHIRA TRADERS",
+    "Outlets_Name": "Oachira Trader",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/92466615cc0a4a87b74d8282bf92d024",
+    "Shelf_Talkers": [
+      "KITCHEN TREASURES CHICKEN MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES MEAT MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES INTRODUCING OUR NEXT-LEVEL CRUSHED CHILLI"
+    ],
+    "Facings": {
+      "Chilli Powder 250 g": 4,
+      "Chilli Powder 100 g": 3,
+      "Coriander Powder 250 g": 3,
+      "Coriander Powder 100 g": 2,
+      "Kashmiri Chilli Powder 250 g": 2,
+      "Kashmiri Chilli Powder 100 g": 2,
+      "Turmeric Powder 250 g": 2,
+      "Turmeric Powder 100 g": 2
+    },
+    "Total_Facings": 20
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_80058288",
+    "TSM": "Renjith Kumar",
+    "SO": "Remya",
+    "Territory": "TRIVANDRUM",
+    "Beats": "OACHIRA TRADERS",
+    "Outlets_Name": "Oachira Trader",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/12457e2deae04668a71f3db91ec5c284",
+    "Shelf_Talkers": [
+      "KITCHEN TREASURES CHICKEN MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES MEAT MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES INTRODUCING OUR NEXT-LEVEL CRUSHED CHILLI"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chilli Powder 250 g": 3,
+      "Kitchen Treasures Chilli Powder 100 g": 2,
+      "Kitchen Treasures Coriander Powder 250 g": 3,
+      "Kitchen Treasures Coriander Powder 100 g": 2,
+      "Kitchen Treasures Kashmiri Chilli Powder 250 g": 3,
+      "Kitchen Treasures Kashmiri Chilli Powder 100 g": 2,
+      "Kitchen Treasures Turmeric Powder 250 g": 3,
+      "Kitchen Treasures Turmeric Powder 100 g": 2
+    },
+    "Total_Facings": 20
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_80058288",
+    "TSM": "Renjith Kumar",
+    "SO": "Remya",
+    "Territory": "TRIVANDRUM",
+    "Beats": "OACHIRA TRADERS",
+    "Outlets_Name": "Oachira Trader",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/6bdcefee405241e0bdd3578bc8b2e1cf",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Chilli Powder 250 g": 3,
+      "Kitchen Treasures Chilli Powder 100 g": 2,
+      "Kitchen Treasures Coriander Powder 250 g": 3,
+      "Kitchen Treasures Coriander Powder 100 g": 2,
+      "Kitchen Treasures Kashmiri Chilli Powder 250 g": 3,
+      "Kitchen Treasures Kashmiri Chilli Powder 100 g": 2,
+      "Kitchen Treasures Turmeric Powder 250 g": 3,
+      "Kitchen Treasures Turmeric Powder 100 g": 2
+    },
+    "Total_Facings": 20
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_414855399",
+    "TSM": "Renjith Kumar",
+    "SO": "Praveena",
+    "Territory": "TRIVANDRUM",
+    "Beats": "KAE TVM 6",
+    "Outlets_Name": "Vismaya Hypermarket",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/463c2fa2294c43b2bff493e62db3daa4",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Corn Puttu Podi": 1,
+      "Kitchen Treasures Wheat Puttu Podi": 1
+    },
+    "Total_Facings": 2
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_414855399",
+    "TSM": "Renjith Kumar",
+    "SO": "Praveena",
+    "Territory": "TRIVANDRUM",
+    "Beats": "KAE TVM 6",
+    "Outlets_Name": "Vismaya Hypermarket",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/1ed60f25af8f451da9ceecf2e2c7199d",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 1,
+      "Kitchen Treasures Chicken Fry Masala": 1
+    },
+    "Total_Facings": 2
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_414855399",
+    "TSM": "Renjith Kumar",
+    "SO": "Praveena",
+    "Territory": "TRIVANDRUM",
+    "Beats": "KAE TVM 6",
+    "Outlets_Name": "Vismaya Hypermarket",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/2cdd0624684c476395f781df14e3a480",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Chilli Powder 1 kg": 1,
+      "Kitchen Treasures Kashmiri Chilli Powder 250 g": 1
+    },
+    "Total_Facings": 2
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_93613923",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Vineetha MD",
+    "Territory": "WAYANAD",
+    "Beats": "MANANTHAVADY",
+    "Outlets_Name": "DAY MART HYPERMARKET",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/2d6b13be97904bde960d9e5d4d8d891b",
+    "Shelf_Talkers": [
+      "MRP: ₹69 KITCHEN TREASURES PUTTU PODI 1KG",
+      "Puttu Podi MRP:- 83/- BP ₹71"
+    ],
+    "Facings": {
+      "Kitchen Treasures Puttu Podi 1kg": 3
+    },
+    "Total_Facings": 3
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_93613923",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Vineetha MD",
+    "Territory": "WAYANAD",
+    "Beats": "MANANTHAVADY",
+    "Outlets_Name": "DAY MART HYPERMARKET",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/8063c528425441509870ab7b497b052b",
+    "Shelf_Talkers": [
+      "MRP: ₹95 KITCHEN TREASURES PUTTU PODI 1KG",
+      "MRP: ₹83 KITCHEN TREASURES CHEMBA PUTTU PODI 500G",
+      "MRP: ₹53 KITCHEN TREASURES EASY PAALAPPAM MIX 500G"
+    ],
+    "Facings": {
+      "Kitchen Treasures Puttu Podi 1 kg": 3,
+      "Kitchen Treasures Chemba Puttu Podi 500 g": 2,
+      "Kitchen Treasures Appam/Idiyappam 500 g": 2,
+      "Kitchen Treasures Malabar Pathiri Podi 500 g": 1,
+      "Kitchen Treasures Easy Paalappam Mix 500 g": 1
+    },
+    "Total_Facings": 9
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_93613923",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Vineetha MD",
+    "Territory": "WAYANAD",
+    "Beats": "MANANTHAVADY",
+    "Outlets_Name": "DAY MART HYPERMARKET",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/1b08db4aca934a059f2562b9144b8ece",
+    "Shelf_Talkers": [
+      "MRP: ₹69 KITCHEN TREASURES PUTTU PODI 1KG",
+      "Puttu Podi MRP:- 83/- BP ₹71",
+      "Rice Powder MRP:- 83/- BP ₹71/-"
+    ],
+    "Facings": {
+      "Kitchen Treasures Puttu Podi 1 kg": 3,
+      "Kitchen Treasures Puttu podi 500 g": 4,
+      "Kitchen Treasures Chemba Puttu podi 500 g": 2,
+      "Kitchen Treasures Appam/Idiyappam 500 g": 3,
+      "Kitchen Treasures Roasted rice powder 500 g": 2
+    },
+    "Total_Facings": 14
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_93613923",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Vineetha MD",
+    "Territory": "WAYANAD",
+    "Beats": "MANANTHAVADY",
+    "Outlets_Name": "DAY MART HYPERMARKET",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/7b347119fd024b20aaff151195cac78f",
+    "Shelf_Talkers": [
+      "Chicken Masala MRP 53/- NOW @ ORP 47/-",
+      "Meat Masala MRP 53/- NOW @ ORP 47/-",
+      "Sambar Powder MRP 39.9/- SAVE 15"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 4,
+      "Kitchen Treasures Chilli Chicken Masala": 2,
+      "Kitchen Treasures Meat Masala": 3,
+      "Kitchen Treasures Fish Masala": 2,
+      "Kitchen Treasures Sambar Powder": 3,
+      "Kitchen Treasures Biryani Masala": 1
+    },
+    "Total_Facings": 15
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_93613923",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Vineetha MD",
+    "Territory": "WAYANAD",
+    "Beats": "MANANTHAVADY",
+    "Outlets_Name": "DAY MART HYPERMARKET",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/89770015a20545f6af0a3e82aa953d78",
+    "Shelf_Talkers": [
+      "KITCHEN TREASURES CHICKEN MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES MEAT MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES INTRODUCING OUR NEXT-LEVEL CRUSHED CHILLI"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 2,
+      "Kitchen Treasures Chilli Chicken Masala": 1,
+      "Kitchen Treasures Meat Masala": 3,
+      "Kitchen Treasures Fish Masala": 2,
+      "Kitchen Treasures Chicken Fry Masala": 1,
+      "Kitchen Treasures Sambar Powder": 2,
+      "Kitchen Treasures Rasam Powder": 1,
+      "Kitchen Treasures Pickle Powder": 1,
+      "Kitchen Treasures Egg Masala": 1,
+      "Kitchen Treasures Vegetable Masala": 1,
+      "Kitchen Treasures Biryani Masala": 1
+    },
+    "Total_Facings": 16
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_93613923",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Vineetha MD",
+    "Territory": "WAYANAD",
+    "Beats": "MANANTHAVADY",
+    "Outlets_Name": "DAY MART HYPERMARKET",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/c2647697ef084932bbfcbcc0beee5773",
+    "Shelf_Talkers": [
+      "KITCHEN TREASURES CHICKEN MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES MEAT MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES INTRODUCING OUR NEXT-LEVEL CRUSHED CHILLI"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 2,
+      "Kitchen Treasures Chilli Chicken Masala": 1,
+      "Kitchen Treasures Meat Masala": 2,
+      "Kitchen Treasures Fish Masala": 2,
+      "Kitchen Treasures Chicken Fry Masala": 1,
+      "Kitchen Treasures Mutton Masala": 1,
+      "Kitchen Treasures Sambar Powder": 2,
+      "Kitchen Treasures Rasam Powder": 1,
+      "Kitchen Treasures Pickle Powder": 1,
+      "Kitchen Treasures Biryani Masala": 1
+    },
+    "Total_Facings": 14
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_93613923",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Vineetha MD",
+    "Territory": "WAYANAD",
+    "Beats": "MANANTHAVADY",
+    "Outlets_Name": "DAY MART HYPERMARKET",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/d71acf442008429c8df34cfb179efcd0",
+    "Shelf_Talkers": [
+      "OUR PRICE 39.9 SAVE 15"
+    ],
+    "Facings": {},
+    "Total_Facings": 0
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_93613923",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Vineetha MD",
+    "Territory": "WAYANAD",
+    "Beats": "MANANTHAVADY",
+    "Outlets_Name": "DAY MART HYPERMARKET",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/c8db20b4d2a640cfbb57996ceb8b676a",
+    "Shelf_Talkers": [
+      "KITCHEN TREASURES CHICKEN MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES MEAT MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES INTRODUCING OUR NEXT-LEVEL CRUSHED CHILLI"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 3,
+      "Kitchen Treasures Meat Masala": 2,
+      "Kitchen Treasures Fish Masala": 2,
+      "Kitchen Treasures Sambar Powder": 2,
+      "Kitchen Treasures Chilli Powder 250 g": 1,
+      "Kitchen Treasures Chilli Powder 100 g": 1,
+      "Kitchen Treasures Coriander Powder 250 g": 1,
+      "Kitchen Treasures Coriander Powder 100 g": 1,
+      "Kitchen Treasures Kashmiri Chilli Powder 250 g": 1,
+      "Kitchen Treasures Kashmiri Chilli Powder 100 g": 1,
+      "Kitchen Treasures Turmeric Powder 250 g": 1,
+      "Kitchen Treasures Turmeric Powder 100 g": 1,
+      "Kitchen Treasures Black Pepper Powder": 1,
+      "Kitchen Treasures Cumin Powder": 1,
+      "Kitchen Treasures Fenugreek Powder": 1
+    },
+    "Total_Facings": 21
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_93613923",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Vineetha MD",
+    "Territory": "WAYANAD",
+    "Beats": "MANANTHAVADY",
+    "Outlets_Name": "DAY MART HYPERMARKET",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/7d1ac4c42e054ebfb251038875e5fb8d",
+    "Shelf_Talkers": [
+      "KITCHEN TREASURES CHICKEN MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES MEAT MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES INTRODUCING OUR NEXT-LEVEL CRUSHED CHILLI"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 2,
+      "Kitchen Treasures Meat Masala": 3,
+      "Kitchen Treasures Fish Masala": 2,
+      "Kitchen Treasures Sambar Powder": 2,
+      "Kitchen Treasures Chilli Powder 250 g": 1,
+      "Kitchen Treasures Chilli Powder 100 g": 1,
+      "Kitchen Treasures Kashmiri Chilli Powder 250 g": 1,
+      "Kitchen Treasures Kashmiri Chilli Powder 100 g": 1,
+      "Kitchen Treasures Turmeric Powder 250 g": 1,
+      "Kitchen Treasures Turmeric Powder 100 g": 1,
+      "Kitchen Treasures Crushed Chilli 100 g": 1,
+      "Kitchen Treasures Black Pepper Powder": 1,
+      "Kitchen Treasures Cumin Powder": 1
+    },
+    "Total_Facings": 19
+  },
+  {
+    "Outlet_ERP_ID": "ALP 4",
+    "TSM": "Renjith Kumar",
+    "SO": "Sajitha. D",
+    "Territory": "ALLEPPEY",
+    "Beats": "KAE-ALPY-MG AGENCIES",
+    "Outlets_Name": "Edha Hyper Market",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/96ae53c8423c4cb1a18c144c8f502160",
+    "Shelf_Talkers": [
+      "MRP: ₹53/- CHICKEN MASALA NOW @ ORP ₹47/-",
+      "MRP: ₹53/- MEAT MASALA NOW @ ORP ₹47/-",
+      "MRP: ₹117/- KASHMIRI CHILLI",
+      "MRP: ₹100/- CORIANDER POWDER"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 2,
+      "Kitchen Treasures Meat Masala": 2,
+      "Kitchen Treasures Fish Masala": 2,
+      "Kitchen Treasures Fish Fry Masala": 1,
+      "Kitchen Treasures Mutton Masala": 1,
+      "Kitchen Treasures Egg Masala": 1,
+      "Kitchen Treasures Biryani Masala": 1
+    },
+    "Total_Facings": 10
+  },
+  {
+    "Outlet_ERP_ID": "ALP 4",
+    "TSM": "Renjith Kumar",
+    "SO": "Sajitha. D",
+    "Territory": "ALLEPPEY",
+    "Beats": "KAE-ALPY-MG AGENCIES",
+    "Outlets_Name": "Edha Hyper Market",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/e4538fa1376f4435971cab0c6a06a98b",
+    "Shelf_Talkers": [
+      "MRP: 117/-",
+      "MRP: 100/-",
+      "Meat MRP: 53/-",
+      "EHM 45/-",
+      "EHM 48/-"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chilli Powder 250 g": 1,
+      "Kitchen Treasures Chilli Powder 100 g": 1,
+      "Kitchen Treasures Kashmiri Chilli Powder 250 g": 1,
+      "Kitchen Treasures Turmeric Powder 250 g": 1,
+      "Kitchen Treasures Cumin Powder": 1,
+      "Kitchen Treasures Fenugreek Powder": 1
+    },
+    "Total_Facings": 6
+  },
+  {
+    "Outlet_ERP_ID": "ALP 4",
+    "TSM": "Renjith Kumar",
+    "SO": "Sajitha. D",
+    "Territory": "ALLEPPEY",
+    "Beats": "KAE-ALPY-MG AGENCIES",
+    "Outlets_Name": "Edha Hyper Market",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/dbef58b337a544ca8da55335e057d14a",
+    "Shelf_Talkers": [
+      "Puttu Podi MRP:- 83/- BP ₹71",
+      "Rice Powder MRP:- 83/- BP ₹71/-"
+    ],
+    "Facings": {
+      "Kitchen Treasures Puttu Podi 1 kg": 3,
+      "Kitchen Treasures Corn Puttupodi 1 kg": 2,
+      "Kitchen Treasures Roasted Rice Powder 1 kg": 1,
+      "Kitchen Treasures Appam/Idiyappam 500 g": 2
+    },
+    "Total_Facings": 8
+  },
+  {
+    "Outlet_ERP_ID": "rahim",
+    "TSM": "Harishankar TG",
+    "SO": "Renjini jude",
+    "Territory": "ALLEPPEY",
+    "Beats": "KAE-ALPY-MID LINE",
+    "Outlets_Name": "Priya Supermarket",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/6b79b7a7a1b943e0b511edb6e75d2a8b",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 3,
+      "Kitchen Treasures Chilli Chicken Masala": 2,
+      "Kitchen Treasures Meat Masala": 4,
+      "Kitchen Treasures Fish Masala": 2,
+      "Kitchen Treasures Chicken Fry Masala": 1,
+      "Kitchen Treasures Sambar Powder": 3,
+      "Kitchen Treasures Biryani Masala": 1
+    },
+    "Total_Facings": 16
+  },
+  {
+    "Outlet_ERP_ID": "rahim",
+    "TSM": "Harishankar TG",
+    "SO": "Renjini jude",
+    "Territory": "ALLEPPEY",
+    "Beats": "KAE-ALPY-MID LINE",
+    "Outlets_Name": "Priya Supermarket",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/58506b699de741ec8046c961f582af2f",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Chilli Powder 1 kg": 2,
+      "Kitchen Treasures Coriander Powder 1 kg": 1,
+      "Kitchen Treasures Black Pepper Powder": 3,
+      "Kitchen Treasures Cumin Powder": 2,
+      "Kitchen Treasures Fenugreek Powder": 1,
+      "Kitchen Treasures Chilli Powder 250 g": 2,
+      "Kitchen Treasures Chilli Powder 100 g": 1,
+      "Kitchen Treasures Coriander Powder 250 g": 2,
+      "Kitchen Treasures Coriander Powder 100 g": 1,
+      "Kitchen Treasures Kashmiri Chilli Powder 250 g": 2,
+      "Kitchen Treasures Kashmiri Chilli Powder 100 g": 1,
+      "Kitchen Treasures Turmeric Powder 250 g": 2,
+      "Kitchen Treasures Turmeric Powder 100 g": 1
+    },
+    "Total_Facings": 24
+  },
+  {
+    "Outlet_ERP_ID": "MPM3063",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Suhaila MLP",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE -HR1",
+    "Outlets_Name": "Budget Hypermarket Kondotty",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/4c5ecc5b99b44c359a12400d0d4f712a",
+    "Shelf_Talkers": [],
+    "Facings": {},
+    "Total_Facings": 0
+  },
+  {
+    "Outlet_ERP_ID": "MPM3063",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Suhaila MLP",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE -HR1",
+    "Outlets_Name": "Budget Hypermarket Kondotty",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/1b2d59ca23e14afa98c81492b61a1707",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 2,
+      "Kitchen Treasures Spicy Chicken Masala": 1,
+      "Kitchen Treasures Chilli Chicken Masala": 1,
+      "Kitchen Treasures Meat Masala": 2,
+      "Kitchen Treasures Meat Ularthu": 1,
+      "Kitchen Treasures Fish Masala": 2,
+      "Kitchen Treasures Chicken Fry Masala": 1,
+      "Kitchen Treasures Fish Fry Masala": 1,
+      "Kitchen Treasures Mutton Masala": 1,
+      "Kitchen Treasures Sambar Powder": 2,
+      "Kitchen Treasures Rasam Powder": 1,
+      "Kitchen Treasures Pickle Powder": 1,
+      "Kitchen Treasures Vegetable Masala": 1,
+      "Kitchen Treasures Egg Masala": 1,
+      "Kitchen Treasures Garam Masala": 1,
+      "Kitchen Treasures Biryani Masala": 1
+    },
+    "Total_Facings": 22
+  },
+  {
+    "Outlet_ERP_ID": "MPM3063",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Suhaila MLP",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE -HR1",
+    "Outlets_Name": "Budget Hypermarket Kondotty",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/864db90640a846a7aa02d86b1f98939e",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 3,
+      "Kitchen Treasures Chilli Chicken Masala": 2,
+      "Kitchen Treasures Meat Masala": 4,
+      "Kitchen Treasures Fish Masala": 2,
+      "Kitchen Treasures Chicken Fry Masala": 1,
+      "Kitchen Treasures Sambar Powder": 2,
+      "Kitchen Treasures Biryani Masala": 1
+    },
+    "Total_Facings": 15
+  },
+  {
+    "Outlet_ERP_ID": "MPM3063",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Suhaila MLP",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE -HR1",
+    "Outlets_Name": "Budget Hypermarket Kondotty",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/5acf393cab7c42f2a341b04ca5401ab4",
+    "Shelf_Talkers": [
+      "KITCHEN TREASURES CHICKEN MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES MEAT MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES INTRODUCING OUR NEXT-LEVEL CRUSHED CHILLI"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chilli Powder 1 kg": 2,
+      "Kitchen Treasures Coriander Powder 1 kg": 1,
+      "Kitchen Treasures Black Pepper Powder": 2,
+      "Kitchen Treasures Cumin Powder": 2,
+      "Kitchen Treasures Fenugreek Powder": 1,
+      "Kitchen Treasures Chilli Powder 250 g": 2,
+      "Kitchen Treasures Chilli Powder 100 g": 2,
+      "Kitchen Treasures Coriander Powder 250 g": 1,
+      "Kitchen Treasures Coriander Powder 100 g": 1,
+      "Kitchen Treasures Kashmiri Chilli Powder 250 g": 1,
+      "Kitchen Treasures Kashmiri Chilli Powder 100 g": 1,
+      "Kitchen Treasures Turmeric Powder 250 g": 1,
+      "Kitchen Treasures Turmeric Powder 100 g": 1
+    },
+    "Total_Facings": 19
+  },
+  {
+    "Outlet_ERP_ID": "MPM3063",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Suhaila MLP",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE -HR1",
+    "Outlets_Name": "Budget Hypermarket Kondotty",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/be0827af53ef4edc987507aec8509e6a",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Chilli Powder 250 g": 2,
+      "Kitchen Treasures Chilli Powder 100 g": 2,
+      "Kitchen Treasures Coriander Powder 250 g": 2,
+      "Kitchen Treasures Coriander Powder 100 g": 2,
+      "Kitchen Treasures Kashmiri Chilli Powder 250 g": 2,
+      "Kitchen Treasures Kashmiri Chilli Powder 100 g": 2,
+      "Kitchen Treasures Turmeric Powder 250 g": 2,
+      "Kitchen Treasures Turmeric Powder 100 g": 2,
+      "Kitchen Treasures Black Pepper Powder": 1,
+      "Kitchen Treasures Cumin Powder": 1,
+      "Kitchen Treasures Fenugreek Powder": 1
+    },
+    "Total_Facings": 19
+  },
+  {
+    "Outlet_ERP_ID": "MPM3063",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Suhaila MLP",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE -HR1",
+    "Outlets_Name": "Budget Hypermarket Kondotty",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/998169b99272406b8aa60072fe239ef2",
+    "Shelf_Talkers": [],
+    "Facings": {},
+    "Total_Facings": 0
+  },
+  {
+    "Outlet_ERP_ID": "CALICUT00525",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Shabina",
+    "Territory": "CALICUT",
+    "Beats": "MAHE",
+    "Outlets_Name": "CARREFRESH HYPER MARKET AZHIYOOR",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/dcdcad5a17964f5db3e0507656a38402",
+    "Shelf_Talkers": [
+      "MRP: ₹69 KITCHEN TREASURES PUTTU PODI 1KG",
+      "Puttu Podi MRP:- 83/- BP ₹71"
+    ],
+    "Facings": {
+      "Kitchen Treasures Puttu Podi 1kg": 3,
+      "Kitchen Treasures Wheat Puttu Podi 1kg": 2,
+      "Kitchen Treasures Ragi Puttu Podi 1kg": 1,
+      "Kitchen Treasures Corn Puttu Podi 1kg": 1,
+      "Kitchen Treasures Appam/Idiyappam 1kg": 1
+    },
+    "Total_Facings": 8
+  },
+  {
+    "Outlet_ERP_ID": "CALICUT00525",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Shabina",
+    "Territory": "CALICUT",
+    "Beats": "MAHE",
+    "Outlets_Name": "CARREFRESH HYPER MARKET AZHIYOOR",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/6bf1cdd494d04efcba837ef750d33015",
+    "Shelf_Talkers": [
+      "MRP: ₹69 KITCHEN TREASURES PUTTU PODI 1KG",
+      "Puttu Podi MRP:- 83/- BP ₹71"
+    ],
+    "Facings": {
+      "Kitchen Treasures Puttu Podi 1 kg": 3,
+      "Kitchen Treasures Wheat Puttu Podi 1 kg": 2,
+      "Kitchen Treasures Ragi Puttu Podi 1 kg": 2,
+      "Kitchen Treasures Corn Puttu Podi 1 kg": 1
+    },
+    "Total_Facings": 8
+  },
+  {
+    "Outlet_ERP_ID": "CALICUT00525",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Shabina",
+    "Territory": "CALICUT",
+    "Beats": "MAHE",
+    "Outlets_Name": "CARREFRESH HYPER MARKET AZHIYOOR",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/2c867d79e98d462c99bcb8372e663d41",
+    "Shelf_Talkers": [
+      "MRP: ₹69 KITCHEN TREASURES PUTTU PODI 1KG"
+    ],
+    "Facings": {
+      "Kitchen Treasures Wheat Puttu Podi 1 kg": 1,
+      "Kitchen Treasures Ragi Puttu Podi 1 kg": 1,
+      "Kitchen Treasures Corn Puttu Podi 1 kg": 1,
+      "Kitchen Treasures Chemba Puttu Podi 500 g": 1,
+      "Kitchen Treasures Appam/Idiyappam 500 g": 1,
+      "Kitchen Treasures Malabar Pathiri Podi 1 kg": 1,
+      "Kitchen Treasures Easy Paalappam Mix 1 kg": 1
+    },
+    "Total_Facings": 7
+  },
+  {
+    "Outlet_ERP_ID": "CALICUT00525",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Shabina",
+    "Territory": "CALICUT",
+    "Beats": "MAHE",
+    "Outlets_Name": "CARREFRESH HYPER MARKET AZHIYOOR",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/9564f3d916ff470b9b424299b8653673",
+    "Shelf_Talkers": [
+      "MRP: ₹39 KITCHEN TREASURES CHICKEN MASALA"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chilli Chicken Masala": 2,
+      "Kitchen Treasures Coriander Powder": 2,
+      "Kitchen Treasures Turmeric Powder": 2,
+      "Kitchen Treasures Chicken Masala": 2,
+      "Kitchen Treasures Meat Masala": 3,
+      "Kitchen Treasures Fish Masala": 1
+    },
+    "Total_Facings": 12
+  },
+  {
+    "Outlet_ERP_ID": "CALICUT00525",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Shabina",
+    "Territory": "CALICUT",
+    "Beats": "MAHE",
+    "Outlets_Name": "CARREFRESH HYPER MARKET AZHIYOOR",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/8f4715e5cbbf43d6ac4e1aa0719eaea2",
+    "Shelf_Talkers": [
+      "KT MASALA CHICKEN MRP 39"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 2,
+      "Kitchen Treasures Chilli Chicken Masala": 1,
+      "Kitchen Treasures Meat Masala": 2,
+      "Kitchen Treasures Meat Ularthu": 1,
+      "Kitchen Treasures Fish Masala": 1,
+      "Kitchen Treasures Chicken Fry Masala": 1,
+      "Kitchen Treasures Mutton Masala": 1,
+      "Kitchen Treasures Sambar Powder": 2,
+      "Kitchen Treasures Rasam Powder": 1,
+      "Kitchen Treasures Pickle Powder": 1,
+      "Kitchen Treasures Vegetable Masala": 1,
+      "Kitchen Treasures Egg Masala": 1,
+      "Kitchen Treasures Garam Masala": 1,
+      "Kitchen Treasures Biryani Masala": 1
+    },
+    "Total_Facings": 18
+  },
+  {
+    "Outlet_ERP_ID": "CALICUT00525",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Shabina",
+    "Territory": "CALICUT",
+    "Beats": "MAHE",
+    "Outlets_Name": "CARREFRESH HYPER MARKET AZHIYOOR",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/a9a367cc59c44624847948ef89857ce6",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Chilli Powder 250 g": 2,
+      "Kitchen Treasures Chilli Powder 100 g": 1,
+      "Kitchen Treasures Coriander Powder 250 g": 1,
+      "Kitchen Treasures Coriander Powder 100 g": 1,
+      "Kitchen Treasures Kashmiri Chilli Powder 250 g": 1,
+      "Kitchen Treasures Kashmiri Chilli Powder 100 g": 1,
+      "Kitchen Treasures Turmeric Powder 250 g": 1,
+      "Kitchen Treasures Turmeric Powder 100 g": 1
+    },
+    "Total_Facings": 10
+  },
+  {
+    "Outlet_ERP_ID": "CALICUT00525",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Shabina",
+    "Territory": "CALICUT",
+    "Beats": "MAHE",
+    "Outlets_Name": "CARREFRESH HYPER MARKET AZHIYOOR",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/5dc643d1395947759c4d3ee72d8f69fe",
+    "Shelf_Talkers": [
+      "MRP: 39/- IT MASALA CHICKEN MEAT"
+    ],
+    "Facings": {
+      "Kitchen Treasures Sambar Powder": 2,
+      "Kitchen Treasures Pickle Powder": 1,
+      "Kitchen Treasures Rasam Powder": 1,
+      "Kitchen Treasures Chutney Powder": 1,
+      "Kitchen Treasures Coriander Powder 250 g": 1,
+      "Kitchen Treasures Kashmiri Chilli Powder 250 g": 1,
+      "Kitchen Treasures Turmeric Powder 250 g": 1,
+      "Kitchen Treasures 100% Chilli Powder": 1
+    },
+    "Total_Facings": 9
+  },
+  {
+    "Outlet_ERP_ID": "WYD671",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Sindhu AV",
+    "Territory": "WAYANAD",
+    "Beats": "KALPATTA",
+    "Outlets_Name": "Jamjoom Plaza Pvt Ltd . Kalpetta",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/e864d67da05144ccafc4543b0d5b028c",
+    "Shelf_Talkers": [],
+    "Facings": {},
+    "Total_Facings": 0
+  },
+  {
+    "Outlet_ERP_ID": "WYD671",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Sindhu AV",
+    "Territory": "WAYANAD",
+    "Beats": "KALPATTA",
+    "Outlets_Name": "Jamjoom Plaza Pvt Ltd . Kalpetta",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/b3e1f85bad1145289693fe77082d1f0c",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Puttupodi 1 kg": 1,
+      "Kitchen Treasures Roasted Rice Powder 500 g": 1,
+      "Kitchen Treasures Appam/Idiyappam 500 g": 2
+    },
+    "Total_Facings": 4
+  },
+  {
+    "Outlet_ERP_ID": "WYD671",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Sindhu AV",
+    "Territory": "WAYANAD",
+    "Beats": "KALPATTA",
+    "Outlets_Name": "Jamjoom Plaza Pvt Ltd . Kalpetta",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/cf0e214e13aa417287015fe9427ef93c",
+    "Shelf_Talkers": [],
+    "Facings": {},
+    "Total_Facings": 0
+  },
+  {
+    "Outlet_ERP_ID": "WYD671",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Sindhu AV",
+    "Territory": "WAYANAD",
+    "Beats": "KALPATTA",
+    "Outlets_Name": "Jamjoom Plaza Pvt Ltd . Kalpetta",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/661283306dbd45418788d178d46d40fd",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 2,
+      "Kitchen Treasures Spicy Chicken Masala": 1,
+      "Kitchen Treasures Chilli Chicken Masala": 1,
+      "Kitchen Treasures Meat Masala": 2,
+      "Kitchen Treasures Fish Masala": 1,
+      "Kitchen Treasures Chicken Fry Masala": 1,
+      "Kitchen Treasures Mutton Masala": 1,
+      "Kitchen Treasures Sambar Powder": 2,
+      "Kitchen Treasures Rasam Powder": 1,
+      "Kitchen Treasures Pickle Powder": 1,
+      "Kitchen Treasures Vegetable Masala": 1,
+      "Kitchen Treasures Egg Masala": 1,
+      "Kitchen Treasures Biryani Masala": 1
+    },
+    "Total_Facings": 17
+  },
+  {
+    "Outlet_ERP_ID": "WYD671",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Sindhu AV",
+    "Territory": "WAYANAD",
+    "Beats": "KALPATTA",
+    "Outlets_Name": "Jamjoom Plaza Pvt Ltd . Kalpetta",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/3c390c4f6dbc40fab5f883266d0621d1",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Chilli Powder 1 kg": 2,
+      "Chilli Powder 250 g": 3,
+      "Chilli Powder 100 g": 2,
+      "Coriander Powder 250 g": 2,
+      "Coriander Powder 100 g": 2,
+      "Kashmiri Chilli Powder 250 g": 2,
+      "Kashmiri Chilli Powder 100 g": 2,
+      "Turmeric Powder 250 g": 2,
+      "Turmeric Powder 100 g": 2
+    },
+    "Total_Facings": 19
+  },
+  {
+    "Outlet_ERP_ID": "WYD671",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Sindhu AV",
+    "Territory": "WAYANAD",
+    "Beats": "KALPATTA",
+    "Outlets_Name": "Jamjoom Plaza Pvt Ltd . Kalpetta",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/8e7f4603ec374f2d8e37c36120c5182e",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Chilli Powder 250 g": 2,
+      "Kitchen Treasures Chilli Powder 100 g": 1,
+      "Kitchen Treasures Coriander Powder 250 g": 2,
+      "Kitchen Treasures Coriander Powder 100 g": 1,
+      "Kitchen Treasures Kashmiri Chilli Powder 250 g": 2,
+      "Kitchen Treasures Kashmiri Chilli Powder 100 g": 1,
+      "Kitchen Treasures Turmeric Powder 250 g": 2,
+      "Kitchen Treasures Turmeric Powder 100 g": 1,
+      "Kitchen Treasures Black Pepper Powder": 1,
+      "Kitchen Treasures Cumin Powder": 1
+    },
+    "Total_Facings": 14
+  },
+  {
+    "Outlet_ERP_ID": "EKM020",
+    "TSM": "Harishankar TG",
+    "SO": "Renjini jude",
+    "Territory": "ERNAKULAM",
+    "Beats": "WH-MANNA",
+    "Outlets_Name": "Anupam Traders",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/7916288b24f24eefb33f465ee2c2fc79",
+    "Shelf_Talkers": [
+      "Puttu Podi MRP:- 83/- BP ₹71",
+      "Rice Powder MRP:- 83/- BP ₹71/-"
+    ],
+    "Facings": {
+      "Kitchen Treasures Puttu Podi 1 kg": 2,
+      "Kitchen Treasures Appam/Idiyappam 1 kg": 1
+    },
+    "Total_Facings": 3
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_199477017",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Malavika",
+    "Territory": "KASARGOD",
+    "Beats": "KANHANAGAD",
+    "Outlets_Name": "Shoprix Super Center Kanhangad",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/888ff1b05d1a47f6af023aa89699f4ba",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Chilli Powder 250 g": 2,
+      "Chilli Powder 100 g": 1,
+      "Coriander Powder 250 g": 2,
+      "Coriander Powder 100 g": 1,
+      "Kashmiri Chilli Powder 250 g": 2,
+      "Kashmiri Chilli Powder 100 g": 1,
+      "Turmeric Powder 250 g": 2,
+      "Turmeric Powder 100 g": 1
+    },
+    "Total_Facings": 12
+  },
+  {
+    "Outlet_ERP_ID": "FO_INGR_199477017",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Malavika",
+    "Territory": "KASARGOD",
+    "Beats": "KANHANAGAD",
+    "Outlets_Name": "Shoprix Super Center Kanhangad",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/50cc8fbf47974ec1aa2b49ea820fc6ae",
+    "Shelf_Talkers": [
+      "MRP: ₹69 KITCHEN TREASURES PUTTU PODI 1KG",
+      "Puttu Podi MRP:- 83/- BP ₹71",
+      "Rice Powder MRP:- 83/- BP ₹71/-"
+    ],
+    "Facings": {
+      "Kitchen Treasures Puttu Podi 1kg": 3,
+      "Kitchen Treasures Roasted Rice Powder": 2,
+      "Kitchen Treasures Appam/Idiyappam": 2
+    },
+    "Total_Facings": 7
+  },
+  {
+    "Outlet_ERP_ID": "KAZ584",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Divya KSD",
+    "Territory": "KASARGOD",
+    "Beats": "KASARAGOD",
+    "Outlets_Name": "VISWAS ASSOCIATES",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/67a03473cb9a4191aa34e40fe48e35b6",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Chilli Powder 250 g": 1,
+      "Kitchen Treasures Coriander Powder 250 g": 1,
+      "Kitchen Treasures Kashmiri Chilli Powder 250 g": 1,
+      "Kitchen Treasures Turmeric Powder 250 g": 1
+    },
+    "Total_Facings": 4
+  },
+  {
+    "Outlet_ERP_ID": "KAZ584",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Divya KSD",
+    "Territory": "KASARGOD",
+    "Beats": "KASARAGOD",
+    "Outlets_Name": "VISWAS ASSOCIATES",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/9ffe5554ea544e0c993b8f4c0b32a761",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Chilli Powder 250 g": 2,
+      "Kitchen Treasures Chilli Powder 100 g": 1,
+      "Kitchen Treasures Coriander Powder 250 g": 2,
+      "Kitchen Treasures Coriander Powder 100 g": 1,
+      "Kitchen Treasures Kashmiri Chilli Powder 250 g": 2,
+      "Kitchen Treasures Kashmiri Chilli Powder 100 g": 1,
+      "Kitchen Treasures Turmeric Powder 250 g": 2,
+      "Kitchen Treasures Turmeric Powder 100 g": 1
+    },
+    "Total_Facings": 12
+  },
+  {
+    "Outlet_ERP_ID": "KAZ584",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Divya KSD",
+    "Territory": "KASARGOD",
+    "Beats": "KASARAGOD",
+    "Outlets_Name": "VISWAS ASSOCIATES",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/85031fc0272544e0802e50501d215e72",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 2,
+      "Kitchen Treasures Meat Masala": 2,
+      "Kitchen Treasures Fish Masala": 1,
+      "Kitchen Treasures Sambar Powder": 1,
+      "Kitchen Treasures Biryani Masala": 1
+    },
+    "Total_Facings": 7
+  },
+  {
+    "Outlet_ERP_ID": "KAZ584",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Divya KSD",
+    "Territory": "KASARGOD",
+    "Beats": "KASARAGOD",
+    "Outlets_Name": "VISWAS ASSOCIATES",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/103c75fd80424c78a22b8d7097436271",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Puttu Podi 1 kg": 3
+    },
+    "Total_Facings": 3
+  },
+  {
+    "Outlet_ERP_ID": "v",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Sabitha",
+    "Territory": "CALICUT",
+    "Beats": "KAE - BEST",
+    "Outlets_Name": "Kozhikode Hypermarket Llp",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/77ebde92c11e4f16a9d8ff036a6fed96",
+    "Shelf_Talkers": [
+      "MRP: ₹69 KITCHEN TREASURES PUTTU PODI 1KG",
+      "Puttu Podi MRP:- 83/- BP ₹71"
+    ],
+    "Facings": {
+      "Kitchen Treasures Puttu Podi 1kg": 3
+    },
+    "Total_Facings": 3
+  },
+  {
+    "Outlet_ERP_ID": "v",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Sabitha",
+    "Territory": "CALICUT",
+    "Beats": "KAE - BEST",
+    "Outlets_Name": "Kozhikode Hypermarket Llp",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/af65122c7f87413089a3584bf5eace72",
+    "Shelf_Talkers": [
+      "MRP: ₹69 KITCHEN TREASURES PUTTU PODI 1KG",
+      "Puttu Podi MRP:- 83/- BP ₹71",
+      "Rice Powder MRP:- 83/- BP ₹71/-"
+    ],
+    "Facings": {
+      "Kitchen Treasures Puttu Podi 1kg": 3,
+      "Kitchen Treasures Roasted Rice Powder": 2,
+      "Kitchen Treasures Appam/Idiyappam": 2
+    },
+    "Total_Facings": 7
+  },
+  {
+    "Outlet_ERP_ID": "v",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Sabitha",
+    "Territory": "CALICUT",
+    "Beats": "KAE - BEST",
+    "Outlets_Name": "Kozhikode Hypermarket Llp",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/0028cc2761c54cf8a1834e46a8d88dc0",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Puttu Podi 1kg": 12
+    },
+    "Total_Facings": 12
+  },
+  {
+    "Outlet_ERP_ID": "v",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Sabitha",
+    "Territory": "CALICUT",
+    "Beats": "KAE - BEST",
+    "Outlets_Name": "Kozhikode Hypermarket Llp",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/63ca0e434b1347399c70cc766dbe38bb",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 5,
+      "Kitchen Treasures Chilli Chicken Masala": 3,
+      "Kitchen Treasures Meat Masala": 4,
+      "Kitchen Treasures Fish Masala": 2,
+      "Kitchen Treasures Chicken Fry Masala": 2,
+      "Kitchen Treasures Sambar Powder": 6,
+      "Kitchen Treasures Biryani Masala": 1
+    },
+    "Total_Facings": 23
+  },
+  {
+    "Outlet_ERP_ID": "v",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Sabitha",
+    "Territory": "CALICUT",
+    "Beats": "KAE - BEST",
+    "Outlets_Name": "Kozhikode Hypermarket Llp",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/31c70332e9194308ad72b7c6c9c4677c",
+    "Shelf_Talkers": [
+      "KITCHEN TREASURES CHICKEN MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES MEAT MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES INTRODUCING OUR NEXT-LEVEL CRUSHED CHILLI"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 4,
+      "Kitchen Treasures Spicy Chicken Masala": 2,
+      "Kitchen Treasures Chilli Chicken Masala": 2,
+      "Kitchen Treasures Meat Masala": 5,
+      "Kitchen Treasures Fish Masala": 3,
+      "Kitchen Treasures Chicken Fry Masala": 2,
+      "Kitchen Treasures Fish Fry Masala": 1,
+      "Kitchen Treasures Mutton Masala": 2,
+      "Kitchen Treasures Sambar Powder": 4,
+      "Kitchen Treasures Rasam Powder": 2,
+      "Kitchen Treasures Pickle Powder": 1,
+      "Kitchen Treasures Vegetable Masala": 1,
+      "Kitchen Treasures Egg Masala": 1,
+      "Kitchen Treasures Garam Masala": 1,
+      "Kitchen Treasures Biryani Masala": 1
+    },
+    "Total_Facings": 33
+  },
+  {
+    "Outlet_ERP_ID": "v",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Sabitha",
+    "Territory": "CALICUT",
+    "Beats": "KAE - BEST",
+    "Outlets_Name": "Kozhikode Hypermarket Llp",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/6cc1901aa7b0404f86803100043d8e60",
+    "Shelf_Talkers": [
+      "MRP: ₹69 KITCHEN TREASURES PUTTU PODI 1KG",
+      "KITCHEN TREASURES CHICKEN MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES MEAT MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES INTRODUCING OUR NEXT-LEVEL CRUSHED CHILLI"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chilli Powder 1 kg": 2,
+      "Kitchen Treasures Coriander Powder 1 kg": 1,
+      "Kitchen Treasures Chilli Powder 250 g": 3,
+      "Kitchen Treasures Chilli Powder 100 g": 2,
+      "Kitchen Treasures Coriander Powder 250 g": 2,
+      "Kitchen Treasures Coriander Powder 100 g": 2,
+      "Kitchen Treasures Kashmiri Chilli Powder 250 g": 2,
+      "Kitchen Treasures Kashmiri Chilli Powder 100 g": 2,
+      "Kitchen Treasures Turmeric Powder 250 g": 2,
+      "Kitchen Treasures Turmeric Powder 100 g": 2
+    },
+    "Total_Facings": 20
+  },
+  {
+    "Outlet_ERP_ID": "v",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Sabitha",
+    "Territory": "CALICUT",
+    "Beats": "KAE - BEST",
+    "Outlets_Name": "Kozhikode Hypermarket Llp",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/fb09bfa2bb114145980a3f02a20985ad",
+    "Shelf_Talkers": [
+      "KITCHEN TREASURES CHICKEN MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES MEAT MASALA MRP 53/- NOW @ ORP 47/-",
+      "KITCHEN TREASURES INTRODUCING OUR NEXT-LEVEL CRUSHED CHILLI"
+    ],
+    "Facings": {
+      "Kitchen Treasures Chilli Powder 1 kg": 2,
+      "Kitchen Treasures Coriander Powder 1 kg": 1,
+      "Kitchen Treasures Chilli Powder 250 g": 3,
+      "Kitchen Treasures Chilli Powder 100 g": 2,
+      "Kitchen Treasures Coriander Powder 250 g": 2,
+      "Kitchen Treasures Coriander Powder 100 g": 2,
+      "Kitchen Treasures Kashmiri Chilli Powder 250 g": 2,
+      "Kitchen Treasures Kashmiri Chilli Powder 100 g": 2,
+      "Kitchen Treasures Turmeric Powder 250 g": 2,
+      "Kitchen Treasures Turmeric Powder 100 g": 2,
+      "Kitchen Treasures Black Pepper Powder": 1,
+      "Kitchen Treasures Cumin Powder": 1,
+      "Kitchen Treasures Fenugreek Powder": 1
+    },
+    "Total_Facings": 25
+  },
+  {
+    "Outlet_ERP_ID": "CLT034",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Vineetha",
+    "Territory": "CALICUT",
+    "Beats": "WS-BEST",
+    "Outlets_Name": "Bharath Supermarket",
+    "Entity_Name": "MASALA",
+    "Image": "http://static.fieldassist.io/campaignresponse/9b1e5e6a68f846f9bc0356efdf3b610f",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Chicken Masala": 3,
+      "Kitchen Treasures Chilli Chicken Masala": 2,
+      "Kitchen Treasures Meat Masala": 4,
+      "Kitchen Treasures Fish Masala": 2,
+      "Kitchen Treasures Chicken Fry Masala": 2,
+      "Kitchen Treasures Mutton Masala": 1,
+      "Kitchen Treasures Sambar Powder": 3,
+      "Kitchen Treasures Rasam Powder": 1,
+      "Kitchen Treasures Pickle Powder": 1,
+      "Kitchen Treasures Vegetable Masala": 1,
+      "Kitchen Treasures Biryani Masala": 1
+    },
+    "Total_Facings": 22
+  },
+  {
+    "Outlet_ERP_ID": "CLT034",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Vineetha",
+    "Territory": "CALICUT",
+    "Beats": "WS-BEST",
+    "Outlets_Name": "Bharath Supermarket",
+    "Entity_Name": "SPICE POWDERS",
+    "Image": "http://static.fieldassist.io/campaignresponse/e548d71c146540da990e283719fbf16b",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Chilli Powder 1 kg": 2,
+      "Kitchen Treasures Coriander Powder 1 kg": 1,
+      "Kitchen Treasures Black Pepper Powder": 3,
+      "Kitchen Treasures Cumin Powder": 2,
+      "Kitchen Treasures Fenugreek Powder": 1,
+      "Kitchen Treasures Chilli Powder 250 g": 2,
+      "Kitchen Treasures Chilli Powder 100 g": 1,
+      "Kitchen Treasures Coriander Powder 250 g": 2,
+      "Kitchen Treasures Coriander Powder 100 g": 1,
+      "Kitchen Treasures Kashmiri Chilli Powder 250 g": 2,
+      "Kitchen Treasures Kashmiri Chilli Powder 100 g": 1,
+      "Kitchen Treasures Turmeric Powder 250 g": 2,
+      "Kitchen Treasures Turmeric Powder 100 g": 1
+    },
+    "Total_Facings": 24
+  },
+  {
+    "Outlet_ERP_ID": "CLT034",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Vineetha",
+    "Territory": "CALICUT",
+    "Beats": "WS-BEST",
+    "Outlets_Name": "Bharath Supermarket",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/380ba01c58ad459681e12658792fc5ee",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Puttu Podi 1kg": 3,
+      "Kitchen Treasures Appam/Idiyappam": 2
+    },
+    "Total_Facings": 5
+  },
+  {
+    "Outlet_ERP_ID": "CLT034",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Vineetha",
+    "Territory": "CALICUT",
+    "Beats": "WS-BEST",
+    "Outlets_Name": "Bharath Supermarket",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/4645e76ceb0e4c36859081c21e3d5876",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Puttu Podi 1 kg": 6
+    },
+    "Total_Facings": 6
+  },
+  {
+    "Outlet_ERP_ID": "CLT034",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Vineetha",
+    "Territory": "CALICUT",
+    "Beats": "WS-BEST",
+    "Outlets_Name": "Bharath Supermarket",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/8d887a1d08d842f0b183c9b411bef6e6",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Puttu Podi 1 kg": 3
+    },
+    "Total_Facings": 3
+  },
+  {
+    "Outlet_ERP_ID": "MPM003",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Suja NH",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE MAL -PERITHALMANNA",
+    "Outlets_Name": "JAM JOOM PLAZA PVT LTD",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/2bcafcbd46d043b6aa6bbd0ef6293456",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Puttu Podi 1 kg": 3
+    },
+    "Total_Facings": 3
+  },
+  {
+    "Outlet_ERP_ID": "MPM003",
+    "TSM": "Ahammed Vaseem",
+    "SO": "Suja NH",
+    "Territory": "MALAPPURAM",
+    "Beats": "KAE MAL -PERITHALMANNA",
+    "Outlets_Name": "JAM JOOM PLAZA PVT LTD",
+    "Entity_Name": "BREAK FAST SERIES",
+    "Image": "http://static.fieldassist.io/campaignresponse/fa56b8bba9424e139b8793ac8d7acf5d",
+    "Shelf_Talkers": [],
+    "Facings": {
+      "Kitchen Treasures Puttu Podi 1kg": 4,
+      "Kitchen Treasures Roasted Rice Powder": 2,
+      "Kitchen Treasures Appam/Idiyappam": 3
+    },
+    "Total_Facings": 9
+  }
+];
+
+    function getMaxFacings(rows) {
+      const combined = {};
+
+      for (const row of rows) {
+        const facings = row.Facings || {};
+        for (const [sku, count] of Object.entries(facings)) {
+          if (!combined[sku] || count > combined[sku]) {
+            combined[sku] = count;
+          }
+        }
+      }
+
+      return combined;
+    }
+
+    function parseShelfTalkers(list) {
+      return list.map(talker => {
+        const priceKeywords = ["MRP", "₹", "BP", "ORP", "Price", "NOW"];
+        const priceRegex = new RegExp(`\\b(${priceKeywords.join("|")})\\b[:\\-]?(.*)`, "i");
+
+        const trimmed = talker.trim();
+
+        // Case 1: Starts with price
+        const startsWithPrice = trimmed.match(/^((MRP|₹|BP|ORP|Price|NOW)[:\-]?\s*[^A-Za-z]*)\s+(.+)/i);
+        if (startsWithPrice) {
+          const price = startsWithPrice[1].trim();
+          const product = startsWithPrice[3].trim();
+          return { product, price };
+        }
+
+        // Case 2: Keyword present elsewhere
+        const match = trimmed.match(priceRegex);
+        if (match && match.index !== undefined) {
+          const splitIndex = match.index;
+          const product = trimmed.slice(0, splitIndex).trim();
+          const price = trimmed.slice(splitIndex).trim();
+          return { product, price };
+        }
+
+        // Case 3: Trailing number
+        const trailingNumber = trimmed.match(/(.*\D)(\d+)\s*$/);
+        if (trailingNumber) {
+          const product = trailingNumber[1].trim();
+          const price = trailingNumber[2].trim();
+          return { product, price };
+        }
+
+        // Case 4: fallback - whole is product
+        return { product: trimmed, price: "" };
+      });
+    }
+    
+    function updateShelfInsights(outletId) {
+      const outletRows = window.shelfInsightsData.filter(d => d["Outlet_ERP_ID"] === outletId);
+
+      // ✅ Shelf Talkers Section
+      const talkerTable = document.getElementById("shelf-talkers-body");
+      const talkerSection = document.getElementById("shelf-talkers-section");
+      talkerTable.innerHTML = "";
+
+      const allTalkers = outletRows.flatMap(r => r.Shelf_Talkers || []);
+      const parsed = parseShelfTalkers(allTalkers);
+
+      if (allTalkers.length > 0) {
+        talkerSection.style.display = "block";
+        talkerTable.innerHTML = `
+          <tr style="background: #2c3e50; color: white;">
+            <th style="padding: 10px; border: 1px solid #ccc;">Outlet ERP ID</th>
+            <th style="padding: 10px; border: 1px solid #ccc;">Product</th>
+            <th style="padding: 10px; border: 1px solid #ccc; width: 30%">Price Info</th>
+          </tr>
+          ${parsed.map((p, idx) => `
+            <tr>
+              ${idx === 0 ? `<td rowspan="${parsed.length}" style="padding: 10px; border: 1px solid #ccc; vertical-align: top;">${outletId}</td>` : ""}
+              <td style="padding: 10px; border: 1px solid #ccc;">${p.product}</td>
+              <td style="padding: 10px; border: 1px solid #ccc;">${p.price}</td>
+            </tr>
+          `).join("")}
+        `;
+      } else {
+        talkerSection.style.display = "none";
+      }
+
+      // ✅ Facings by Entity Name
+      const masalaRows = outletRows.filter(d => d.Entity_Name === "MASALA");
+      const spiceRows = outletRows.filter(d => d.Entity_Name === "SPICE POWDERS");
+
+      const facingsMASALA = getMaxFacings(masalaRows);
+      const facingsSPICE = getMaxFacings(spiceRows);
+
+      const renderFacingTable = (containerId, title, data) => {
+        if (data.length === 0) {
+          document.getElementById(containerId).innerHTML = "";
+          return;
+        }
+
+        let tableHTML = `
+          <h4 style="margin-bottom: 10px;">${title}</h4>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <thead>
+              <tr style="background: #2c3e50; color: white;">
+                <th style="padding: 8px; border: 1px solid #ccc;">SKU</th>
+                <th style="padding: 8px; border: 1px solid #ccc;">Facing Count</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.map(([sku, count]) => `
+                <tr>
+                  <td style="padding: 8px; border: 1px solid #ccc;">${sku}</td>
+                  <td style="padding: 8px; border: 1px solid #ccc;">${count}</td>
+                </tr>`).join("")}
+            </tbody>
+          </table>
+        `;
+
+        document.getElementById(containerId).innerHTML = tableHTML;
+      };
+
+      // ✅ Render Facings Tables
+      const facingsSection = document.getElementById("facings-section");
+      const hasAnyFacings = Object.keys(facingsMASALA).length || Object.keys(facingsSPICE).length || Object.keys(facingsBREAK).length;
+
+      if (hasAnyFacings) {
+        facingsSection.style.display = "block";
+
+        // Insert total SKU facing row
+        const totalMasala = Object.values(facingsMASALA).reduce((a, b) => a + b, 0);
+        const totalSpice = Object.values(facingsSPICE).reduce((a, b) => a + b, 0);
+        const totalAll = totalMasala + totalSpice;
+
+        document.getElementById("total-facing-summary").innerHTML = `
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+            <tr>
+              <td style="padding: 12px; border: 1px solid #ccc; font-weight: bold;">Total SKU Facing Count</td>
+              <td style="padding: 12px; border: 1px solid #ccc;">MASALA: ${totalMasala} &nbsp;&nbsp;|&nbsp;&nbsp; SPICE POWDER: ${totalSpice}</td>
+            </tr>
+          </table>
+        `;
+
+        renderFacingTable("facings-masala-table", "MASALA – SKU Facing Count", Object.entries(facingsMASALA));
+        renderFacingTable("facings-spice-table", "SPICE POWDERS – SKU Facing Count", Object.entries(facingsSPICE));
+        renderFacingTable("facings-breakfast-table").innerHTML = "";
+      } else {
+        facingsSection.style.display = "none";
+      }
+    }
+
+    // Hook into outlet selection
+    document.getElementById("outlet").addEventListener("change", (e) => {
+      const outletId = e.target.value;
+      if (outletId) updateShelfInsights(outletId);
+    });
+  </script>
+
+</body>
+</html>
